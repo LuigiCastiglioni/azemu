@@ -1,0 +1,30 @@
+variables:
+  acr: exampleacr
+  repo: scripted-api
+steps:
+  - bash: |
+      cd apps/sh-api
+      docker build \
+        -f docker/Api.Dockerfile \
+        -t $(acr).azurecr.io/$(repo):$(Build.BuildId) \
+        .
+    displayName: build with shell
+  - pwsh: |
+      Set-Location apps\ps-api
+      az acr build . `
+        --registry $(acr) `
+        --file Dockerfile `
+        --image "ps-api:latest"
+  - task: AzureCLI@2
+    inputs:
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        az functionapp deployment source config-zip --name fn-zip-dev --src apps/fn-zip/out.zip
+        az webapp deploy -n web-zip-dev --src-path apps/web-zip --type zip
+  - task: ArchiveFiles@2
+    inputs:
+      rootFolderOrFile: apps/fn-zip
+      archiveFile: apps/fn-zip/out.zip
+  - script: func azure functionapp publish fn-core-dev --python
+    workingDirectory: apps/fn-core

@@ -1,0 +1,6 @@
+steps:
+  - task: AzureWebApp@1
+    inputs:
+      azureSubscription: sc-example
+      appName: web-app-dev
+      package: $(System.DefaultWorkingDirectory)/apps/web/

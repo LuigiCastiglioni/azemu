@@ -1,0 +1,7 @@
+.azemu/
+.env
+.env.*
+/azemu
+dist/
+examples/*.local/
+testdata/corpus/*.local/

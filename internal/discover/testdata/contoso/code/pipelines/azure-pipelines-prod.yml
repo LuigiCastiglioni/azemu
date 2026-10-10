@@ -1,0 +1,501 @@
+# Azure DevOps pipeline for contoso (PROD, Docker mode).
+#
+# Manual-only. Approval gate on the `prod` environment in Azure DevOps.
+# When queuing a run, toggle which apps to deploy. Each deploy builds the image
+# in the central ACR, patches the target App Service / Function App to the new
+# image (managed-identity pull), and restarts it. A disabled toggle skips that
+# app's deploy and Azure keeps the previous container image.
+#
+# Hardcoded operational config (no variable group). ACR is shared across envs.
+#
+# Prerequisites:
+#   - Service connection: sc-prod-contoso
+#   - GitHub service connection: sc-github-example
+#   - Environment `prod` in Azure DevOps
+#   - Agent pool example-pool (self-hosted, Windows)
+#   - ACR self-grant (mode=create) so the SP can run `az acr build` on exampleacr01
+
+name: app-prod-$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger: none
+pr: none
+
+resources:
+  repositories:
+    - repository: contosoGithub
+      type: github
+      endpoint: sc-github-example
+      name: example-org/contoso_code
+      ref: refs/heads/main
+
+parameters:
+  - name: deployOrdersFunctionApp
+    displayName: "Deploy Orders Function App"
+    type: boolean
+    default: false
+  - name: deployBillingFunctionApp
+    displayName: "Deploy Billing Function App"
+    type: boolean
+    default: false
+  - name: deployMediaFunctionApp
+    displayName: "Deploy Media Function App"
+    type: boolean
+    default: false
+  - name: deployCatalogFunctionApp
+    displayName: "Deploy Catalog Function App"
+    type: boolean
+    default: false
+  - name: deployPromptArtifacts
+    displayName: "Sync prompt artifacts"
+    type: boolean
+    default: false
+  - name: deployBackend
+    displayName: "Deploy Web Backend"
+    type: boolean
+    default: false
+  - name: deployFrontend
+    displayName: "Deploy Web Frontend"
+    type: boolean
+    default: false
+
+variables:
+  - name: azureServiceConnection
+    value: "sc-prod-contoso"
+  - name: imageTag
+    value: "$(Build.BuildId)"
+  - name: agentPoolName
+    value: "example-pool"
+  # --- env config (prod) ---
+  - name: resourceGroupName
+    value: "eunprg01-contoso"
+  - name: storageAccountName
+    value: "eunpstcontoso"
+  - name: ordersFunctionAppName
+    value: "eunp-func-orders"
+  - name: billingFunctionAppName
+    value: "eunp-func-billing"
+  - name: mediaFunctionAppName
+    value: "eunp-func-media"
+  - name: catalogFunctionAppName
+    value: "eunp-func-catalog"
+  - name: backendAppServiceName
+    value: "eunp-app-contoso-backend"
+  - name: frontendAppServiceName
+    value: "eunp-app-contoso-frontend"
+  # --- image repositories (central ACR) ---
+  - name: ordersImageRepository
+    value: "contoso-func-orders"
+  - name: billingImageRepository
+    value: "contoso-func-billing"
+  - name: backendImageRepository
+    value: "contoso-web-backend"
+  - name: frontendImageRepository
+    value: "contoso-web-frontend"
+  # --- shared mgmt ---
+  - name: acrName
+    value: "exampleacr01"
+  - name: acrSubscriptionId
+    value: "00000000-0000-0000-0000-000000000000"
+
+stages:
+  - stage: BuildAndTest
+    displayName: "Build & Test"
+    jobs:
+      - ${{ if or(eq(parameters.deployOrdersFunctionApp, true), eq(parameters.deployBillingFunctionApp, true), eq(parameters.deployMediaFunctionApp, true), eq(parameters.deployCatalogFunctionApp, true)) }}:
+          - job: DurableFunctionAppTests
+            displayName: "Durable Function App tests"
+            pool:
+              name: $(agentPoolName)
+            strategy:
+              matrix:
+                ${{ if eq(parameters.deployOrdersFunctionApp, true) }}:
+                  orders:
+                    durableAppPath: apps/func-orders
+                    durableAppName: Orders Function App
+                ${{ if eq(parameters.deployBillingFunctionApp, true) }}:
+                  billing:
+                    durableAppPath: apps/func-billing
+                    durableAppName: Billing Function App
+                ${{ if eq(parameters.deployMediaFunctionApp, true) }}:
+                  media:
+                    durableAppPath: apps/func-media
+                    durableAppName: Media Function App
+                ${{ if eq(parameters.deployCatalogFunctionApp, true) }}:
+                  catalog:
+                    durableAppPath: apps/func-catalog
+                    durableAppName: Catalog Function App
+            steps:
+              - checkout: contosoGithub
+                clean: true
+                path: s
+              - task: UsePythonVersion@0
+                inputs:
+                  versionSpec: "3.12"
+              - script: |
+                  python -m pip install --upgrade pip
+                  pip install uv
+                displayName: "Install uv"
+              - script: uv sync --frozen
+                workingDirectory: $(durableAppPath)
+                displayName: "Sync dependencies ($(durableAppName))"
+              - script: uv run ruff check .
+                workingDirectory: $(durableAppPath)
+                displayName: "Ruff lint ($(durableAppName))"
+              - script: uv run pytest --cov-fail-under=90 --junitxml=junit.xml
+                workingDirectory: $(durableAppPath)
+                displayName: "Tests + coverage ($(durableAppName))"
+              - task: PublishTestResults@2
+                condition: succeededOrFailed()
+                inputs:
+                  testResultsFormat: "JUnit"
+                  testResultsFiles: "$(durableAppPath)/junit.xml"
+                  testRunTitle: "$(durableAppName)"
+              - task: PublishCodeCoverageResults@2
+                condition: succeededOrFailed()
+                inputs:
+                  summaryFileLocation: "$(durableAppPath)/coverage.xml"
+
+      - ${{ if or(eq(parameters.deployPromptArtifacts, true), eq(parameters.deployOrdersFunctionApp, true), eq(parameters.deployBillingFunctionApp, true), eq(parameters.deployMediaFunctionApp, true), eq(parameters.deployBackend, true)) }}:
+          - job: PromptArtifactValidation
+            displayName: "Prompt artifact source validation"
+            pool:
+              name: $(agentPoolName)
+            steps:
+              - checkout: contosoGithub
+                clean: true
+                path: s
+              - task: PowerShell@2
+                displayName: "Validate prompt artifact sources"
+                inputs:
+                  targetType: filePath
+                  filePath: "$(Build.SourcesDirectory)/scripts/pipeline-sync-prompt-artifacts.ps1"
+                  arguments: "-StorageAccountName dry-run -ValidateOnly"
+
+      - job: BackendTests
+        displayName: "Web Backend tests"
+        condition: eq('${{ parameters.deployBackend }}', true)
+        pool:
+          name: $(agentPoolName)
+        steps:
+          - checkout: contosoGithub
+            clean: true
+            path: s
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.12"
+          - script: |
+              python -m pip install --upgrade pip
+              pip install uv
+            displayName: "Install uv"
+          - script: uv sync --frozen
+            workingDirectory: apps/web-backend
+            displayName: "Sync dependencies (uv)"
+          - script: uv run ruff check .
+            workingDirectory: apps/web-backend
+            displayName: "Ruff lint"
+          - script: uv run pytest --cov-fail-under=90 --junitxml=junit.xml
+            workingDirectory: apps/web-backend
+            displayName: "Tests + coverage (>= 90%)"
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: "JUnit"
+              testResultsFiles: "apps/web-backend/junit.xml"
+              testRunTitle: "Web Backend"
+          - task: PublishCodeCoverageResults@2
+            condition: succeededOrFailed()
+            inputs:
+              summaryFileLocation: "apps/web-backend/coverage.xml"
+
+      - job: FrontendBuild
+        displayName: "Web Frontend build"
+        condition: eq('${{ parameters.deployFrontend }}', true)
+        pool:
+          name: $(agentPoolName)
+        steps:
+          - checkout: contosoGithub
+            clean: true
+            path: s
+          - task: NodeTool@0
+            inputs:
+              versionSpec: "20.x"
+          - script: |
+              where node
+              node --version
+              where npm
+              npm --version
+              node -e "const cp=require('child_process'); const npm=cp.execSync('npm --version').toString().trim(); const nodeMajor=Number(process.versions.node.split('.')[0]); const npmMajor=Number(npm.split('.')[0]); if (nodeMajor < 20 || npmMajor < 10) { console.error('Expected Node 20+/npm 10+, got Node '+process.version+'/npm '+npm); process.exit(1); }"
+            displayName: "Verify Node.js toolchain"
+          - script: npm ci --audit=false --cache "$(Agent.TempDirectory)\.npm"
+            workingDirectory: apps/web-frontend
+            displayName: "Install dependencies"
+          - script: npm run build
+            workingDirectory: apps/web-frontend
+            displayName: "Type-check + build"
+
+  - stage: DeployDurableFunctionApps
+    displayName: "Sync prompts and deploy Durable Function Apps"
+    dependsOn: BuildAndTest
+    condition: and(succeeded(), or(eq('${{ parameters.deployPromptArtifacts }}', true), eq('${{ parameters.deployOrdersFunctionApp }}', true), eq('${{ parameters.deployBillingFunctionApp }}', true), eq('${{ parameters.deployMediaFunctionApp }}', true), eq('${{ parameters.deployCatalogFunctionApp }}', true), eq('${{ parameters.deployBackend }}', true)))
+    jobs:
+      - deployment: DeployDurableFunctionAppsJob
+        displayName: "Validate packages and sync prompt artifacts"
+        environment: "prod"
+        pool:
+          name: $(agentPoolName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: contosoGithub
+                  clean: true
+                  path: s
+                - task: PowerShell@2
+                  displayName: "Ensure Azure CLI (Windows)"
+                  inputs:
+                    targetType: filePath
+                    filePath: "$(Build.SourcesDirectory)/scripts/pipeline-ensure-azure-cli-windows.ps1"
+                - task: UsePythonVersion@0
+                  inputs:
+                    versionSpec: "3.12"
+                - script: |
+                    python -m pip install --upgrade pip
+                    pip install uv
+                  displayName: "Install uv"
+                - task: PowerShell@2
+                  displayName: "Validate Durable Function App packages"
+                  inputs:
+                    targetType: inline
+                    script: |
+                      $ErrorActionPreference = 'Stop'
+                      $apps = @(
+                        @{ Enabled = '${{ parameters.deployOrdersFunctionApp }}'; Path = 'apps/func-orders'; Name = '$(ordersFunctionAppName)' },
+                        @{ Enabled = '${{ parameters.deployBillingFunctionApp }}'; Path = 'apps/func-billing'; Name = '$(billingFunctionAppName)' },
+                        @{ Enabled = '${{ parameters.deployMediaFunctionApp }}'; Path = 'apps/func-media'; Name = '$(mediaFunctionAppName)' },
+                        @{ Enabled = '${{ parameters.deployCatalogFunctionApp }}'; Path = 'apps/func-catalog'; Name = '$(catalogFunctionAppName)' }
+                      )
+                      $sourceRoot = '$(Build.SourcesDirectory)'
+                      foreach ($app in $apps) {
+                        if ($app.Enabled -ne 'true') { continue }
+                        $appPath = Join-Path $sourceRoot $app.Path
+                        & '$(Build.SourcesDirectory)/scripts/pipeline-deploy-flex-function-code.ps1' `
+                          -FunctionAppName $app.Name `
+                          -ResourceGroupName 'dry-run' `
+                          -AppPath $appPath `
+                          -SkipDeploy
+                      }
+                - task: AzureCLI@2
+                  displayName: "Sync prompt artifacts in Blob Storage"
+                  env:
+                    PYTHONIOENCODING: utf-8
+                    PYTHONUTF8: "1"
+                    AZURE_CORE_NO_COLOR: "true"
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: ps
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      $ErrorActionPreference = 'Stop'
+                      chcp 65001 | Out-Null
+                      [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+                      $OutputEncoding = [System.Text.UTF8Encoding]::new()
+                      & '$(Build.SourcesDirectory)/scripts/pipeline-sync-prompt-artifacts.ps1' `
+                        -StorageAccountName '$(storageAccountName)'
+      - ${{ if or(eq(parameters.deployOrdersFunctionApp, true), eq(parameters.deployBillingFunctionApp, true), eq(parameters.deployMediaFunctionApp, true), eq(parameters.deployCatalogFunctionApp, true)) }}:
+          - job: DeployDurableFunctionAppMatrix
+            displayName: "Deploy selected Durable Function Apps"
+            dependsOn: DeployDurableFunctionAppsJob
+            pool:
+              name: $(agentPoolName)
+            strategy:
+              maxParallel: 4
+              matrix:
+                ${{ if eq(parameters.deployOrdersFunctionApp, true) }}:
+                  orders:
+                    functionAppPath: apps/func-orders
+                    functionAppName: $(ordersFunctionAppName)
+                    expectedFunctionNames: ""
+                ${{ if eq(parameters.deployBillingFunctionApp, true) }}:
+                  billing:
+                    functionAppPath: apps/func-billing
+                    functionAppName: $(billingFunctionAppName)
+                    expectedFunctionNames: ""
+                ${{ if eq(parameters.deployMediaFunctionApp, true) }}:
+                  media:
+                    functionAppPath: apps/func-media
+                    functionAppName: $(mediaFunctionAppName)
+                    expectedFunctionNames: "health,start_job,get_job,job_orchestrator,process_chunk_activity,upload_result_activity"
+                ${{ if eq(parameters.deployCatalogFunctionApp, true) }}:
+                  catalog:
+                    functionAppPath: apps/func-catalog
+                    functionAppName: $(catalogFunctionAppName)
+                    expectedFunctionNames: "health,query,sync_warehouse,publish,maintenance_orchestrator,scan_activity,start_scan,cancel_scan"
+            steps:
+              - checkout: contosoGithub
+                clean: true
+                path: s
+              - task: PowerShell@2
+                displayName: "Ensure Azure CLI (Windows)"
+                inputs:
+                  targetType: filePath
+                  filePath: "$(Build.SourcesDirectory)/scripts/pipeline-ensure-azure-cli-windows.ps1"
+              - task: UsePythonVersion@0
+                inputs:
+                  versionSpec: "3.12"
+              - script: |
+                  python -m pip install --upgrade pip
+                  pip install uv
+                displayName: "Install uv"
+              - task: AzureCLI@2
+                displayName: "Package and deploy $(functionAppName)"
+                env:
+                  PYTHONIOENCODING: utf-8
+                  PYTHONUTF8: "1"
+                  AZURE_CORE_NO_COLOR: "true"
+                inputs:
+                  azureSubscription: $(azureServiceConnection)
+                  scriptType: ps
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    $ErrorActionPreference = 'Stop'
+                    $expectedNames = @(
+                      '$(expectedFunctionNames)'.Split(',') |
+                        ForEach-Object { $_.Trim() } |
+                        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+                    )
+                    $deployParameters = @{
+                      FunctionAppName = '$(functionAppName)'
+                      ResourceGroupName = '$(resourceGroupName)'
+                      AppPath = (Join-Path '$(Build.SourcesDirectory)' '$(functionAppPath)')
+                    }
+                    if ($expectedNames.Count -gt 0) {
+                      $deployParameters.ExpectedFunctionNames = $expectedNames
+                    }
+                    & '$(Build.SourcesDirectory)/scripts/pipeline-deploy-flex-function-code.ps1' @deployParameters
+
+  - stage: DeployBackend
+    displayName: "Deploy Web Backend"
+    dependsOn: BuildAndTest
+    condition: and(succeeded(), eq('${{ parameters.deployBackend }}', true))
+    jobs:
+      - deployment: DeployBackendJob
+        displayName: "Build image in ACR, set container image, restart Web App"
+        environment: "prod"
+        pool:
+          name: $(agentPoolName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: contosoGithub
+                  clean: true
+                  path: s
+                - task: PowerShell@2
+                  displayName: "Ensure Azure CLI (Windows)"
+                  inputs:
+                    targetType: filePath
+                    filePath: "$(Build.SourcesDirectory)/scripts/pipeline-ensure-azure-cli-windows.ps1"
+                - task: AzureCLI@2
+                  displayName: "Build & push image in ACR (cloud build)"
+                  env:
+                    PYTHONIOENCODING: utf-8
+                    PYTHONUTF8: "1"
+                    AZURE_CORE_NO_COLOR: "true"
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: ps
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      $ErrorActionPreference = 'Stop'
+                      chcp 65001 | Out-Null
+                      [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+                      $OutputEncoding = [System.Text.UTF8Encoding]::new()
+                      Set-Location apps/web-backend
+                      az acr build . `
+                        --registry $(acrName) `
+                        --subscription $(acrSubscriptionId) `
+                        --platform linux/amd64 `
+                        --file Dockerfile `
+                        --image "$(backendImageRepository):$(imageTag)" `
+                        --image "$(backendImageRepository):latest" `
+                        --no-logs
+                      if ($LASTEXITCODE -ne 0) { throw "ACR build failed with exit code $LASTEXITCODE" }
+                - task: AzureCLI@2
+                  displayName: "Set App Service container image, then restart"
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: ps
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      & '$(Build.SourcesDirectory)/scripts/pipeline-set-webapp-container-image.ps1' `
+                        -WebAppName '$(backendAppServiceName)' `
+                        -ResourceGroupName '$(resourceGroupName)' `
+                        -AcrName '$(acrName)' `
+                        -AcrSubscriptionId '$(acrSubscriptionId)' `
+                        -ImageRepository '$(backendImageRepository)' `
+                        -ImageTag '$(imageTag)' `
+                        -WebsitesPort 8000
+
+  - stage: DeployFrontend
+    displayName: "Deploy Web Frontend"
+    dependsOn: BuildAndTest
+    condition: and(succeeded(), eq('${{ parameters.deployFrontend }}', true))
+    jobs:
+      - deployment: DeployFrontendJob
+        displayName: "Build image in ACR, set container image, restart Web App"
+        environment: "prod"
+        pool:
+          name: $(agentPoolName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: contosoGithub
+                  clean: true
+                  path: s
+                - task: PowerShell@2
+                  displayName: "Ensure Azure CLI (Windows)"
+                  inputs:
+                    targetType: filePath
+                    filePath: "$(Build.SourcesDirectory)/scripts/pipeline-ensure-azure-cli-windows.ps1"
+                - task: AzureCLI@2
+                  displayName: "Build & push image in ACR (cloud build)"
+                  env:
+                    PYTHONIOENCODING: utf-8
+                    PYTHONUTF8: "1"
+                    AZURE_CORE_NO_COLOR: "true"
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: ps
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      $ErrorActionPreference = 'Stop'
+                      chcp 65001 | Out-Null
+                      [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+                      $OutputEncoding = [System.Text.UTF8Encoding]::new()
+                      Set-Location apps/web-frontend
+                      az acr build . `
+                        --registry $(acrName) `
+                        --subscription $(acrSubscriptionId) `
+                        --platform linux/amd64 `
+                        --file Dockerfile `
+                        --image "$(frontendImageRepository):$(imageTag)" `
+                        --image "$(frontendImageRepository):latest" `
+                        --no-logs
+                      if ($LASTEXITCODE -ne 0) { throw "ACR build failed with exit code $LASTEXITCODE" }
+                - task: AzureCLI@2
+                  displayName: "Set App Service container image, then restart"
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: ps
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      & '$(Build.SourcesDirectory)/scripts/pipeline-set-webapp-container-image.ps1' `
+                        -WebAppName '$(frontendAppServiceName)' `
+                        -ResourceGroupName '$(resourceGroupName)' `
+                        -AcrName '$(acrName)' `
+                        -AcrSubscriptionId '$(acrSubscriptionId)' `
+                        -ImageRepository '$(frontendImageRepository)' `
+                        -ImageTag '$(imageTag)' `
+                        -WebsitesPort 80 `
+                        -ExtraAppSettings @('BACKEND_ORIGIN=https://$(backendAppServiceName).azurewebsites.net')

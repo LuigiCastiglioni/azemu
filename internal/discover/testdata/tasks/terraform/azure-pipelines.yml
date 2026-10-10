@@ -1,0 +1,11 @@
+steps:
+  - task: TerraformTaskV4@4
+    inputs:
+      command: init
+      workingDirectory: $(System.DefaultWorkingDirectory)/terraform
+      commandOptions: -reconfigure
+  - task: TerraformCLI@0
+    inputs:
+      command: plan
+      workingDirectory: $(System.DefaultWorkingDirectory)/terraform
+      commandOptions: -var-file=configs/common.tfvars -var-file="configs/dev/terraform.tfvars" -out=tfplan

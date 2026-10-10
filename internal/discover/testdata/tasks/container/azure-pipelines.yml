@@ -1,0 +1,6 @@
+steps:
+  - task: AzureWebAppContainer@1
+    inputs:
+      appName: web-ctr-dev
+      containers: |
+        myreg.azurecr.io/team/ctr-image:$(Build.BuildId)

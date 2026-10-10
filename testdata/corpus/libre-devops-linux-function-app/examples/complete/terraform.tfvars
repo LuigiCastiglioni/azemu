@@ -1,0 +1,2 @@
+short = "azm"
+loc   = "uks"

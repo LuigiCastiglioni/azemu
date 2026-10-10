@@ -1,0 +1,24 @@
+{
+  "_comment": "Azure-Samples/azure-functions-flex-consumption-samples IaC/terraformazurerm. storage_container_endpoint is <primary_blob_endpoint>deploymentpackage, so the host storage account is the one named by var.storageAccountName.",
+  "apps": [
+    {
+      "name": "func-azemu-flex",
+      "resource_type": "azurerm_function_app_flex_consumption",
+      "host": "functions",
+      "kind": "zip",
+      "runtime": "dotnet-isolated",
+      "runtime_version": "9.0",
+      "host_storage": "stazemuflex",
+      "host_storage_mi": true,
+      "easy_auth": false,
+      "settings": {
+        "AzureWebJobsStorage": "",
+        "AzureWebJobsStorage__accountName": "stazemuflex"
+      }
+    }
+  ],
+  "storage_accounts": [
+    {"name": "stazemuflex", "containers": ["deploymentpackage"]}
+  ],
+  "vaults": []
+}

@@ -1,0 +1,2 @@
+prefix   = "azemudemo"
+location = "westeurope"

@@ -1,0 +1,12 @@
+steps:
+  - task: Docker@2
+    inputs:
+      command: buildAndPush
+      containerRegistry: sc-registry
+      repository: team/docker2-app
+      Dockerfile: apps/d2/Dockerfile
+      buildContext: apps/d2
+  - task: Docker@2
+    inputs:
+      command: login
+      containerRegistry: sc-registry

@@ -1,0 +1,17 @@
+parameters:
+  - name: appName
+    type: string
+  - name: folder
+    type: string
+    default: apps/default
+  - name: stage
+    default: dev
+steps:
+  - task: AzureWebApp@1
+    inputs:
+      appName: ${{ parameters.appName }}
+      package: ${{ parameters.folder }}
+  - task: AzureWebApp@1
+    inputs:
+      appName: second-${{ parameters.stage }}
+      package: apps/${{ parameters.stage }}-second

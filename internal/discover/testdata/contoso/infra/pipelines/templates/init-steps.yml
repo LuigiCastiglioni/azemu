@@ -1,0 +1,94 @@
+# ---------------------------------------------------------------------------
+# Shared init steps: install Terraform, load the backend pointer from
+# configs/<env>/backend.tfvars, and run `terraform init`.
+#
+# backend.tfvars is the single source of truth for remote state. Azure
+# Pipelines YAML cannot read a tfvars file directly, so this template parses
+# it at runtime and feeds the values into the TerraformTaskV4 init inputs
+# (which are required by the task). Humans only ever edit backend.tfvars.
+# ---------------------------------------------------------------------------
+
+parameters:
+  - name: terraformWorkingDir
+    type: string
+  - name: environment
+    type: string
+  - name: backendConfigFile
+    type: string
+  - name: terraformConfigFile
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: terraformVersion
+    type: string
+
+steps:
+  - task: TerraformInstaller@1
+    displayName: 'Install Terraform'
+    inputs:
+      terraformVersion: ${{ parameters.terraformVersion }}
+
+  - powershell: |
+      $backendFile = Join-Path "${{ parameters.terraformWorkingDir }}" "${{ parameters.backendConfigFile }}"
+      if (-not (Test-Path $backendFile)) {
+        Write-Error "Missing backend config file: $backendFile"
+        exit 1
+      }
+      $map = @{}
+      Get-Content $backendFile | ForEach-Object {
+        if ($_ -match '^\s*([A-Za-z_]+)\s*=\s*"(.*)"\s*$') { $map[$matches[1]] = $matches[2] }
+      }
+      foreach ($req in 'resource_group_name','storage_account_name','container_name','key') {
+        if (-not $map.ContainsKey($req) -or [string]::IsNullOrWhiteSpace($map[$req]) -or ($map[$req] -match 'CHANGEME')) {
+          Write-Error "backend.tfvars is missing or has a placeholder value for: $req. Fill $backendFile (or rerun setup/fill_tf_template.py) before running this pipeline."
+          exit 1
+        }
+      }
+      if ([string]::IsNullOrWhiteSpace('${{ parameters.serviceConnection }}') -or ('${{ parameters.serviceConnection }}' -match 'changeme')) {
+        Write-Error "serviceConnection parameter is unset or still 'changeme'. Set it in the env pipeline's parameters block."
+        exit 1
+      }
+      Write-Host "##vso[task.setvariable variable=backendResourceGroup]$($map['resource_group_name'])"
+      Write-Host "##vso[task.setvariable variable=backendStorageAccount]$($map['storage_account_name'])"
+      Write-Host "##vso[task.setvariable variable=backendContainer]$($map['container_name'])"
+      Write-Host "##vso[task.setvariable variable=backendKey]$($map['key'])"
+      Write-Host "Backend config loaded from $backendFile"
+    displayName: 'Load backend config from backend.tfvars'
+
+  - powershell: |
+      $tfvarsFile = Join-Path "${{ parameters.terraformWorkingDir }}" "${{ parameters.terraformConfigFile }}"
+      if (-not (Test-Path $tfvarsFile)) {
+        Write-Error "Missing Terraform config file: $tfvarsFile"
+        exit 1
+      }
+
+      $environment = $null
+      Get-Content $tfvarsFile | ForEach-Object {
+        if ($_ -match '^\s*environment\s*=\s*"([^"]+)"\s*$') { $environment = $matches[1] }
+      }
+
+      if ([string]::IsNullOrWhiteSpace($environment)) {
+        Write-Error "terraform.tfvars is missing an environment value: $tfvarsFile"
+        exit 1
+      }
+      if ($environment -ne '${{ parameters.environment }}') {
+        Write-Error "Pipeline environment '${{ parameters.environment }}' does not match terraform.tfvars environment '$environment' in $tfvarsFile."
+        exit 1
+      }
+      Write-Host "Terraform config environment '$environment' matches pipeline environment."
+    displayName: 'Validate terraform.tfvars environment'
+
+  - task: TerraformTaskV4@4
+    displayName: 'terraform init'
+    inputs:
+      provider: 'azurerm'
+      command: 'init'
+      workingDirectory: ${{ parameters.terraformWorkingDir }}
+      backendServiceArm: ${{ parameters.serviceConnection }}
+      backendAzureRmResourceGroupName: $(backendResourceGroup)
+      backendAzureRmStorageAccountName: $(backendStorageAccount)
+      backendAzureRmContainerName: $(backendContainer)
+      backendAzureRmKey: $(backendKey)
+      # Self-hosted agents keep .terraform between runs; -reconfigure resets
+      # the cached backend config (remote state is untouched).
+      commandOptions: '-reconfigure'

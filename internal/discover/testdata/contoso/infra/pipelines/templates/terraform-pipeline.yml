@@ -1,0 +1,143 @@
+# ---------------------------------------------------------------------------
+# Reusable Terraform Plan + gated Apply stages for one environment.
+#
+# All three env pipelines (dev/test/prod) consume this template so the
+# stage logic lives in exactly one place. The only per-environment inputs are
+# the environment name and the ARM service connection; everything else is
+# derived from the environment.
+#
+# Backend state config is read at runtime from
+# terraform/configs/<environment>/backend.tfvars (see init-steps.yml).
+# ---------------------------------------------------------------------------
+
+parameters:
+  - name: environment
+    type: string
+    values:
+      - dev
+      - test
+      - prod
+  - name: serviceConnection
+    type: string
+  - name: poolName
+    type: string
+    default: example-pool
+  - name: terraformVersion
+    type: string
+    default: 1.11.4
+
+stages:
+  # -------------------------------------------------------------------------
+  # Plan
+  # -------------------------------------------------------------------------
+  - stage: Plan
+    displayName: 'Plan (${{ parameters.environment }})'
+    jobs:
+      - job: TerraformPlan
+        displayName: 'terraform plan'
+        pool:
+          name: ${{ parameters.poolName }}
+        variables:
+          terraformWorkingDir: $(System.DefaultWorkingDirectory)/terraform
+        steps:
+          - template: init-steps.yml
+            parameters:
+              terraformWorkingDir: $(terraformWorkingDir)
+              environment: ${{ parameters.environment }}
+              backendConfigFile: configs/${{ parameters.environment }}/backend.tfvars
+              terraformConfigFile: configs/${{ parameters.environment }}/terraform.tfvars
+              serviceConnection: ${{ parameters.serviceConnection }}
+              terraformVersion: ${{ parameters.terraformVersion }}
+
+          - powershell: terraform fmt -check -recursive
+            displayName: 'terraform fmt -check'
+            workingDirectory: $(terraformWorkingDir)
+
+          - task: TerraformTaskV4@4
+            displayName: 'terraform validate'
+            inputs:
+              provider: 'azurerm'
+              command: 'validate'
+              workingDirectory: $(terraformWorkingDir)
+
+          - task: TerraformTaskV4@4
+            displayName: 'terraform plan'
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              workingDirectory: $(terraformWorkingDir)
+              environmentServiceNameAzureRM: ${{ parameters.serviceConnection }}
+              commandOptions: '-var-file=configs/_tenant.tfvars -var-file=configs/${{ parameters.environment }}/terraform.tfvars -out=tfplan.bin -input=false'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish plan artifact'
+            inputs:
+              targetPath: '$(terraformWorkingDir)/tfplan.bin'
+              artifact: 'terraform-plan-${{ parameters.environment }}'
+
+  # -------------------------------------------------------------------------
+  # Manual approval — the run pauses here (ManualValidation@0, agentless
+  # server job) until a human reviews the published plan and resumes.
+  # -------------------------------------------------------------------------
+  - stage: ApprovePlan
+    displayName: 'Approve plan (${{ parameters.environment }})'
+    dependsOn: Plan
+    condition: succeeded()
+    jobs:
+      - job: wait_for_plan_approval
+        displayName: 'Review plan and approve'
+        pool: server
+        timeoutInMinutes: 4320
+        steps:
+          - task: ManualValidation@0
+            displayName: 'Resume to allow terraform apply'
+            timeoutInMinutes: 4320
+            inputs:
+              instructions: |
+                Review the Plan (${{ parameters.environment }}) logs and the published artifact **terraform-plan-${{ parameters.environment }}** (tfplan.bin), then click **Resume** to continue to Apply (${{ parameters.environment }}).
+              onTimeout: 'reject'
+
+  # -------------------------------------------------------------------------
+  # Apply — runs only after Plan and the manual approval stage succeed.
+  # The Azure DevOps environment can carry a second approval/check layer.
+  # -------------------------------------------------------------------------
+  - stage: Apply
+    displayName: 'Apply (${{ parameters.environment }})'
+    dependsOn: ApprovePlan
+    condition: succeeded()
+    jobs:
+      - deployment: TerraformApply
+        displayName: 'terraform apply'
+        pool:
+          name: ${{ parameters.poolName }}
+        environment: '${{ parameters.environment }}'   # Configure approval gates on this environment in Azure DevOps
+        variables:
+          terraformWorkingDir: $(System.DefaultWorkingDirectory)/terraform
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Deployment jobs do not check out the repo by default; the
+                # .tf files and backend.tfvars are needed for init.
+                - checkout: self
+
+                - template: init-steps.yml
+                  parameters:
+                    terraformWorkingDir: $(terraformWorkingDir)
+                    environment: ${{ parameters.environment }}
+                    backendConfigFile: configs/${{ parameters.environment }}/backend.tfvars
+                    terraformConfigFile: configs/${{ parameters.environment }}/terraform.tfvars
+                    serviceConnection: ${{ parameters.serviceConnection }}
+                    terraformVersion: ${{ parameters.terraformVersion }}
+
+                - download: current
+                  artifact: terraform-plan-${{ parameters.environment }}
+
+                - task: TerraformTaskV4@4
+                  displayName: 'terraform apply'
+                  inputs:
+                    provider: 'azurerm'
+                    command: 'apply'
+                    workingDirectory: $(terraformWorkingDir)
+                    environmentServiceNameAzureRM: ${{ parameters.serviceConnection }}
+                    commandOptions: '-input=false $(Pipeline.Workspace)/terraform-plan-${{ parameters.environment }}/tfplan.bin'

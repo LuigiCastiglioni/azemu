@@ -1,0 +1,21 @@
+{
+  "_comment": "hashicorp/terraform-provider-azurerm examples/app-service/function-python, prefix=azemudemo. Oracle: hand-written from the HCL, cross-checked against plan.json.",
+  "apps": [
+    {
+      "name": "azemudemo-python-example-app",
+      "resource_type": "azurerm_linux_function_app",
+      "host": "functions",
+      "kind": "zip",
+      "runtime": "python",
+      "runtime_version": "3.9",
+      "host_storage": "azemudemostorageacct",
+      "host_storage_mi": false,
+      "easy_auth": false,
+      "settings": {}
+    }
+  ],
+  "storage_accounts": [
+    {"name": "azemudemostorageacct"}
+  ],
+  "vaults": []
+}

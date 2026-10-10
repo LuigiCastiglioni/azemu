@@ -1,0 +1,12 @@
+steps:
+  - task: AzureRmWebAppDeployment@4
+    inputs:
+      appType: webAppContainer
+      WebAppName: web-rm-dev
+      DockerNamespace: myreg.azurecr.io
+      DockerRepository: rm-image
+      DockerImageTag: latest
+  - task: AzureRmWebAppDeployment@4
+    inputs:
+      WebAppName: web-rm-zip
+      packageForLinux: apps/rmzip

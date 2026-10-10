@@ -1,0 +1,27 @@
+# ---------------------------------------------------------------------------
+# Terraform pipeline — dev environment.
+# Runs on every push to main. Plan is published as an artifact; Apply requires
+# manual approval on the 'dev' Azure DevOps environment before executing.
+#
+# All stage logic lives in templates/terraform-pipeline.yml. The only thing to
+# fill here is `serviceConnection` (setup/fill_tf_template.py does this).
+# Backend state config is read from terraform/configs/dev/backend.tfvars.
+# ---------------------------------------------------------------------------
+
+trigger:
+  branches:
+    include:
+      - dev
+  paths:
+    include:
+      - terraform/**
+      - pipelines/azure-pipelines-dev.yml
+      - pipelines/templates/**
+
+pr: none
+
+stages:
+  - template: templates/terraform-pipeline.yml
+    parameters:
+      environment: dev
+      serviceConnection: sc-dev-contoso

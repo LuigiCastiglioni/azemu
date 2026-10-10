@@ -1,0 +1,8 @@
+subscriptionId          = "00000000-0000-0000-0000-000000000000"
+resourceGroupName       = "rg-azemu-flex"
+location                = "westeurope"
+applicationInsightsName = "appi-azemu-flex"
+logAnalyticsName        = "log-azemu-flex"
+functionAppName         = "func-azemu-flex"
+functionPlanName        = "plan-azemu-flex"
+storageAccountName      = "stazemuflex"

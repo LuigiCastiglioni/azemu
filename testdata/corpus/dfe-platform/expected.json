@@ -1,0 +1,78 @@
+{
+  "_comment": "DFE-Digital/education-benchmarking-and-insights platform/terraform. The 8 *-fa modules default to os_type=Windows (azurerm_windows_function_app: not modelled, one warning each); the 8 *-fc-fa modules are Linux flex consumption apps. chart-rendering-fa is inside a /* */ comment. Data sources (key vault, subnets, app insights, mssql, client_config) are unreadable offline, so everything derived from them is unknown/placeholder; secret VALUES are not checked but the secret NAME inside every @Microsoft.KeyVault reference is. versionless_id has no trailing slash. Hand-written from the HCL; no plan.json (data sources need real Azure resources).",
+  "apps": [
+    {"name": "s999d01-ebis-content-fc-fa", "resource_type": "azurerm_function_app_flex_consumption", "host": "functions", "kind": "zip", "runtime": "dotnet-isolated", "runtime_version": "8.0", "host_storage": "s999d01ebisconsa", "host_storage_mi": true, "easy_auth": false, "settings": {
+      "Sql__ConnectionString": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/core-sql-connection-string-managed-identity[)]$",
+      "AZURE_CLIENT_ID": null,
+      "AzureWebJobsSecretStorageType": "keyvault",
+      "AzureWebJobsSecretStorageKeyVaultUri": "https://s999d01-ebis-con-kv.vault.azure.net/",
+      "AzureWebJobsSecretStorageKeyVaultClientId": null
+    }},
+    {"name": "s999d01-ebis-local-authority-fc-fa", "resource_type": "azurerm_function_app_flex_consumption", "host": "functions", "kind": "zip", "runtime": "dotnet-isolated", "runtime_version": "8.0", "host_storage": "s999d01ebislasa", "host_storage_mi": true, "easy_auth": false, "settings": {
+      "Search__Name": "s999d01-ebis-search",
+      "Search__Key": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/ebis-search-admin-key[)]$",
+      "Sql__ConnectionString": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/core-sql-connection-string-managed-identity[)]$",
+      "AZURE_CLIENT_ID": null,
+      "AzureWebJobsSecretStorageType": "keyvault",
+      "AzureWebJobsSecretStorageKeyVaultUri": "https://s999d01-ebis-la-kv.vault.azure.net/",
+      "AzureWebJobsSecretStorageKeyVaultClientId": null
+    }},
+    {"name": "s999d01-ebis-school-fc-fa", "resource_type": "azurerm_function_app_flex_consumption", "host": "functions", "kind": "zip", "runtime": "dotnet-isolated", "runtime_version": "8.0", "host_storage": "s999d01ebisschsa", "host_storage_mi": true, "easy_auth": false, "settings": {
+      "Search__Name": "s999d01-ebis-search",
+      "Search__Key": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/ebis-search-admin-key[)]$",
+      "Sql__ConnectionString": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/core-sql-connection-string-managed-identity[)]$",
+      "Cache__Host": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/ebis-cache-host-name[)]$",
+      "Cache__Port": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/ebis-cache-ssl-port[)]$",
+      "AZURE_CLIENT_ID": null,
+      "AzureWebJobsSecretStorageType": "keyvault",
+      "AzureWebJobsSecretStorageKeyVaultUri": "https://s999d01-ebis-sch-kv.vault.azure.net/",
+      "AzureWebJobsSecretStorageKeyVaultClientId": null
+    }},
+    {"name": "s999d01-ebis-trust-fc-fa", "resource_type": "azurerm_function_app_flex_consumption", "host": "functions", "kind": "zip", "runtime": "dotnet-isolated", "runtime_version": "8.0", "host_storage": "s999d01ebistrusa", "host_storage_mi": true, "easy_auth": false, "settings": {
+      "Search__Name": "s999d01-ebis-search",
+      "Search__Key": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/ebis-search-admin-key[)]$",
+      "Sql__ConnectionString": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/core-sql-connection-string-managed-identity[)]$",
+      "AZURE_CLIENT_ID": null,
+      "AzureWebJobsSecretStorageType": "keyvault",
+      "AzureWebJobsSecretStorageKeyVaultUri": "https://s999d01-ebis-tru-kv.vault.azure.net/",
+      "AzureWebJobsSecretStorageKeyVaultClientId": null
+    }},
+    {"name": "s999d01-ebis-benchmark-fc-fa", "resource_type": "azurerm_function_app_flex_consumption", "host": "functions", "kind": "zip", "runtime": "dotnet-isolated", "runtime_version": "8.0", "host_storage": "s999d01ebisbensa", "host_storage_mi": true, "easy_auth": false, "settings": {
+      "Search__Name": "s999d01-ebis-search",
+      "Search__Key": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/ebis-search-admin-key[)]$",
+      "Sql__ConnectionString": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/core-sql-connection-string-managed-identity[)]$",
+      "PipelineMessageHub__ConnectionString": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/data-storage-connection-string[)]$",
+      "PipelineMessageHub__JobPendingQueue": "data-pipeline-job-pending",
+      "AZURE_CLIENT_ID": null,
+      "AzureWebJobsSecretStorageType": "keyvault",
+      "AzureWebJobsSecretStorageKeyVaultUri": "https://s999d01-ebis-ben-kv.vault.azure.net/",
+      "AzureWebJobsSecretStorageKeyVaultClientId": null
+    }},
+    {"name": "s999d01-ebis-insight-fc-fa", "resource_type": "azurerm_function_app_flex_consumption", "host": "functions", "kind": "zip", "runtime": "dotnet-isolated", "runtime_version": "8.0", "host_storage": "s999d01ebisinssa", "host_storage_mi": true, "easy_auth": false, "settings": {
+      "Sql__ConnectionString": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/core-sql-connection-string-managed-identity[)]$",
+      "Cache__Host": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/ebis-cache-host-name[)]$",
+      "Cache__Port": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/ebis-cache-ssl-port[)]$",
+      "AZURE_CLIENT_ID": null,
+      "AzureWebJobsSecretStorageType": "keyvault",
+      "AzureWebJobsSecretStorageKeyVaultUri": "https://s999d01-ebis-ins-kv.vault.azure.net/",
+      "AzureWebJobsSecretStorageKeyVaultClientId": null
+    }},
+    {"name": "s999d01-ebis-maintenance-tasks-fc-fa", "resource_type": "azurerm_function_app_flex_consumption", "host": "functions", "kind": "zip", "runtime": "dotnet-isolated", "runtime_version": "8.0", "host_storage": "s999d01ebismtsa", "host_storage_mi": true, "easy_auth": false, "settings": {
+      "Sql__ConnectionString": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://[^/]+/secrets/core-sql-connection-string-managed-identity[)]$",
+      "AZURE_CLIENT_ID": null,
+      "AzureWebJobsSecretStorageType": "keyvault",
+      "AzureWebJobsSecretStorageKeyVaultUri": "https://s999d01-ebis-mt-kv.vault.azure.net/",
+      "AzureWebJobsSecretStorageKeyVaultClientId": null
+    }},
+    {"name": "s999d01-ebis-chart-rendering-fc-fa", "resource_type": "azurerm_function_app_flex_consumption", "host": "functions", "kind": "zip", "runtime": "node", "runtime_version": "22", "host_storage": "s999d01ebischasa", "host_storage_mi": true, "easy_auth": false, "settings": {
+      "WEBSITES_ENABLE_APP_SERVICE_STORAGE": "true",
+      "AZURE_CLIENT_ID": null,
+      "AzureWebJobsSecretStorageType": "keyvault",
+      "AzureWebJobsSecretStorageKeyVaultUri": "https://s999d01-ebis-cha-kv.vault.azure.net/",
+      "AzureWebJobsSecretStorageKeyVaultClientId": null
+    }}
+  ],
+  "storage_accounts": [{"name": "s999d01ebisconsa", "containers": ["func-app"]}, {"name": "s999d01ebislasa", "containers": ["func-app"]}, {"name": "s999d01ebisschsa", "containers": ["func-app"]}, {"name": "s999d01ebistrusa", "containers": ["func-app"]}, {"name": "s999d01ebisbensa", "containers": ["func-app"]}, {"name": "s999d01ebisinssa", "containers": ["func-app"]}, {"name": "s999d01ebismtsa", "containers": ["func-app"]}, {"name": "s999d01ebischasa", "containers": ["func-app"]}, {"name": "s999d01platformstorage"}, {"name": "s999d01orchestrator"}],
+  "vaults": ["s999d01-ebis-con-kv", "s999d01-ebis-la-kv", "s999d01-ebis-sch-kv", "s999d01-ebis-tru-kv", "s999d01-ebis-ben-kv", "s999d01-ebis-ins-kv", "s999d01-ebis-mt-kv", "s999d01-ebis-cha-kv"],
+  "warnings_contain": ["s999d01-ebis-local-authority-fa", "s999d01-ebis-school-fa", "s999d01-ebis-trust-fa", "s999d01-ebis-benchmark-fa", "s999d01-ebis-insight-fa", "s999d01-ebis-content-fa", "s999d01-ebis-maintenance-tasks-fa", "s999d01-ebis-orchestrator-fa"]
+}

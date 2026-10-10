@@ -1,0 +1,17 @@
+variables:
+  - name: apiApp
+    value: api-dev
+steps:
+  - task: PowerShell@2
+    inputs:
+      targetType: inline
+      script: |
+        & ./scripts/deploy.ps1 `
+          -FunctionAppName '$(apiApp)' `
+          -ResourceGroupName rg `
+          -AppPath (Join-Path '$(Build.SourcesDirectory)' 'apps/api')
+        $apps = @(
+          @{ Path = 'apps/h1'; Name = 'h1-dev'; Enabled = 'true' },
+          @{ Path = 'apps/h2'; Name = '$(fromGroup)' }
+        )
+        & ./scripts/set-image.ps1 -WebAppName 'img-dev' -ImageRepository 'img-repo' -ImageTag 1 -WebsitesPort 8080

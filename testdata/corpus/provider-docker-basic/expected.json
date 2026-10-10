@@ -1,0 +1,18 @@
+{
+  "_comment": "hashicorp/terraform-provider-azurerm examples/app-service/docker-basic, prefix=azemudemo. docker_registry_url is dropped, the image is repo:tag.",
+  "apps": [
+    {
+      "name": "azemudemo-example",
+      "resource_type": "azurerm_linux_web_app",
+      "host": "appservice",
+      "kind": "docker",
+      "docker_image": "nginx:latest",
+      "easy_auth": false,
+      "settings": {
+        "WEBSITES_ENABLE_APP_SERVICE_STORAGE": "false"
+      }
+    }
+  ],
+  "storage_accounts": [],
+  "vaults": []
+}

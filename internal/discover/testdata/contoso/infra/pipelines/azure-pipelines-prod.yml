@@ -1,0 +1,19 @@
+# ---------------------------------------------------------------------------
+# Terraform pipeline — prod environment.
+# Trigger is manual only. Configure two-person approval on the 'prod'
+# Azure DevOps environment before Apply runs.
+#
+# All stage logic lives in templates/terraform-pipeline.yml. The only thing to
+# fill here is `serviceConnection` (setup/fill_tf_template.py does this).
+# Backend state config is read from terraform/configs/prod/backend.tfvars.
+# ---------------------------------------------------------------------------
+
+trigger: none
+
+pr: none
+
+stages:
+  - template: templates/terraform-pipeline.yml
+    parameters:
+      environment: prod
+      serviceConnection: changeme

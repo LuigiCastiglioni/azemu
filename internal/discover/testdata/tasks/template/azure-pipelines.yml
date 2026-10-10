@@ -1,0 +1,7 @@
+variables:
+  tplApp: tpl-app-dev
+stages:
+  - template: tpl/deploy.yml
+    parameters:
+      appName: $(tplApp)
+      folder: apps/tplfolder

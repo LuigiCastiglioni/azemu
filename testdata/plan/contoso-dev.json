@@ -1,0 +1,556 @@
+{
+ "format_version": "1.2",
+ "planned_values": {
+  "root_module": {
+   "child_modules": [
+    {
+     "address": "module.durable_function_apps[\"orders\"]",
+     "resources": [
+      {
+       "address": "module.durable_function_apps[\"orders\"].azurerm_storage_account.func_host",
+       "name": "func_host",
+       "type": "azurerm_storage_account",
+       "values": {
+        "name": "eundstfuncorders"
+       }
+      },
+      {
+       "address": "module.durable_function_apps[\"orders\"].azurerm_function_app_flex_consumption.this[0]",
+       "index": 0,
+       "name": "this",
+       "type": "azurerm_function_app_flex_consumption",
+       "values": {
+        "app_settings": {
+         "AI_MODEL_TABLE_ENDPOINT": "https://eundstcontoso.table.core.windows.net/",
+         "APPLICATIONINSIGHTS_CONNECTION_STRING": "InstrumentationKey=00000000-0000-0000-0000-000000000009",
+         "DD_SERVICE": "example-orders",
+         "CATALOG_FUNCTION_BASE_URL": "https://eund-func-catalog.azurewebsites.net",
+         "GRAPH_CLIENT_ID": "00000000-0000-0000-0000-000000000002",
+         "GRAPH_CLIENT_SECRET": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/GRAPH-CLIENT-SECRET/)",
+         "GRAPH_TENANT_ID": "00000000-0000-0000-0000-000000000001",
+         "LLM_API_KEY": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/API-KEY/)",
+         "LLM_BASE_URL": "https://example-openai.cognitiveservices.azure.com/openai/v1/",
+         "PROMPT_ARTIFACTS_CONTAINER": "prompt-artifacts",
+         "WAREHOUSE_ACCOUNT": "example-warehouse",
+         "WAREHOUSE_DATABASE": "EXAMPLE_DB",
+         "WAREHOUSE_PASSWORD": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/WAREHOUSE-PASSWORD/)",
+         "WAREHOUSE_USER": "SVC_EXAMPLE",
+         "STORAGE_ACCOUNT_NAME": "eundstcontoso"
+        },
+        "auth_settings_v2": [
+         {
+          "active_directory_v2": [
+           {
+            "client_id": "00000000-0000-0000-0000-000000000003"
+           }
+          ],
+          "auth_enabled": true,
+          "excluded_paths": [
+           "/api/health"
+          ],
+          "require_authentication": true
+         }
+        ],
+        "name": "eund-func-orders",
+        "runtime_name": "python",
+        "runtime_version": "3.12",
+        "site_config": [
+         {
+          "application_insights_connection_string": "InstrumentationKey=00000000-0000-0000-0000-000000000009",
+          "minimum_tls_version": "1.3"
+         }
+        ],
+        "storage_access_key": "REDACTED",
+        "storage_authentication_type": "StorageAccountConnectionString",
+        "storage_container_endpoint": "https://eundstfuncorders.blob.core.windows.net/flex-content"
+       }
+      }
+     ]
+    },
+    {
+     "address": "module.durable_function_apps[\"billing\"]",
+     "resources": [
+      {
+       "address": "module.durable_function_apps[\"billing\"].azurerm_storage_account.func_host",
+       "name": "func_host",
+       "type": "azurerm_storage_account",
+       "values": {
+        "name": "eundstfuncbilling"
+       }
+      },
+      {
+       "address": "module.durable_function_apps[\"billing\"].azurerm_function_app_flex_consumption.this[0]",
+       "index": 0,
+       "name": "this",
+       "type": "azurerm_function_app_flex_consumption",
+       "values": {
+        "app_settings": {
+         "AI_MODEL_TABLE_ENDPOINT": "https://eundstcontoso.table.core.windows.net/",
+         "GRAPH_CLIENT_ID": "00000000-0000-0000-0000-000000000002",
+         "GRAPH_CLIENT_SECRET": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/GRAPH-CLIENT-SECRET/)",
+         "GRAPH_TENANT_ID": "00000000-0000-0000-0000-000000000001",
+         "LLM_API_KEY": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/API-KEY/)",
+         "LLM_BASE_URL": "https://example-openai.cognitiveservices.azure.com/openai/v1/",
+         "WAREHOUSE_ACCOUNT": "example-warehouse",
+         "WAREHOUSE_DATABASE": "EXAMPLE_DB",
+         "WAREHOUSE_PASSWORD": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/WAREHOUSE-PASSWORD/)",
+         "WAREHOUSE_USER": "SVC_EXAMPLE",
+         "STORAGE_ACCOUNT_NAME": "eundstcontoso",
+         "BILLING_MAX_ATTEMPTS": "3"
+        },
+        "auth_settings_v2": [
+         {
+          "active_directory_v2": [
+           {
+            "client_id": "00000000-0000-0000-0000-000000000003"
+           }
+          ],
+          "auth_enabled": true,
+          "excluded_paths": [
+           "/api/health"
+          ],
+          "require_authentication": true
+         }
+        ],
+        "name": "eund-func-billing",
+        "runtime_name": "python",
+        "runtime_version": "3.12",
+        "site_config": [
+         {
+          "application_insights_connection_string": "InstrumentationKey=00000000-0000-0000-0000-000000000009",
+          "minimum_tls_version": "1.3"
+         }
+        ],
+        "storage_access_key": "REDACTED",
+        "storage_authentication_type": "StorageAccountConnectionString",
+        "storage_container_endpoint": "https://eundstfuncbilling.blob.core.windows.net/flex-content"
+       }
+      }
+     ]
+    },
+    {
+     "address": "module.durable_function_apps[\"catalog\"]",
+     "resources": [
+      {
+       "address": "module.durable_function_apps[\"catalog\"].azurerm_storage_account.func_host",
+       "name": "func_host",
+       "type": "azurerm_storage_account",
+       "values": {
+        "name": "eundstfunccatalog"
+       }
+      },
+      {
+       "address": "module.durable_function_apps[\"catalog\"].azurerm_function_app_flex_consumption.this[0]",
+       "index": 0,
+       "name": "this",
+       "type": "azurerm_function_app_flex_consumption",
+       "values": {
+        "app_settings": {
+         "AI_MODEL_TABLE_ENDPOINT": "https://eundstcontoso.table.core.windows.net/",
+         "CATALOG_REGISTRY_TABLE_NAME": "CatalogItems",
+         "CATALOG_CONTAINER": "catalog-content",
+         "CATALOG_GRAPH_CLIENT_SECRET": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/GRAPH-CLIENT-SECRET/)",
+         "CATALOG_STORAGE_ACCOUNT_URL": "https://eundstcatalog.blob.core.windows.net/",
+         "CATALOG_TABLE_ENDPOINT": "https://eundstcatalog.table.core.windows.net/",
+         "LLM_API_KEY": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/API-KEY/)",
+         "LLM_BASE_URL": "https://example-openai.cognitiveservices.azure.com/openai/v1/",
+         "WAREHOUSE_ACCOUNT": "example-warehouse",
+         "WAREHOUSE_DATABASE": "EXAMPLE_DB",
+         "WAREHOUSE_PASSWORD": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/WAREHOUSE-PASSWORD/)",
+         "WAREHOUSE_USER": "SVC_EXAMPLE"
+        },
+        "auth_settings_v2": [
+         {
+          "active_directory_v2": [
+           {
+            "client_id": "00000000-0000-0000-0000-000000000003"
+           }
+          ],
+          "auth_enabled": true,
+          "excluded_paths": [
+           "/api/health"
+          ],
+          "require_authentication": true
+         }
+        ],
+        "name": "eund-func-catalog",
+        "runtime_name": "python",
+        "runtime_version": "3.12",
+        "site_config": [
+         {
+          "application_insights_connection_string": "InstrumentationKey=00000000-0000-0000-0000-000000000009",
+          "minimum_tls_version": "1.3"
+         }
+        ],
+        "storage_access_key": "REDACTED",
+        "storage_authentication_type": "StorageAccountConnectionString",
+        "storage_container_endpoint": "https://eundstfunccatalog.blob.core.windows.net/flex-content"
+       }
+      }
+     ]
+    },
+    {
+     "address": "module.durable_function_apps[\"media\"]",
+     "resources": [
+      {
+       "address": "module.durable_function_apps[\"media\"].azurerm_storage_account.func_host",
+       "name": "func_host",
+       "type": "azurerm_storage_account",
+       "values": {
+        "name": "eundstfuncmedia"
+       }
+      },
+      {
+       "address": "module.durable_function_apps[\"media\"].azurerm_function_app_flex_consumption.this[0]",
+       "index": 0,
+       "name": "this",
+       "type": "azurerm_function_app_flex_consumption",
+       "values": {
+        "app_settings": {
+         "AI_MODEL_TABLE_ENDPOINT": "https://eundstcontoso.table.core.windows.net/",
+         "MEDIA_PROVIDER_API_KEY": "REDACTED-PLAINTEXT-IN-TFVARS",
+         "MEDIA_PROVIDER_BASE_URL": "https://api.media-provider.example.com",
+         "LLM_API_KEY": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/API-KEY/)",
+         "LLM_BASE_URL": "https://example-openai.cognitiveservices.azure.com/openai/v1/",
+         "STORAGE_ACCOUNT_NAME": "eundstcontoso"
+        },
+        "auth_settings_v2": [
+         {
+          "active_directory_v2": [
+           {
+            "client_id": "00000000-0000-0000-0000-000000000003"
+           }
+          ],
+          "auth_enabled": true,
+          "excluded_paths": [
+           "/api/health"
+          ],
+          "require_authentication": true
+         }
+        ],
+        "name": "eund-func-media",
+        "runtime_name": "python",
+        "runtime_version": "3.12",
+        "site_config": [
+         {
+          "application_insights_connection_string": "InstrumentationKey=00000000-0000-0000-0000-000000000009",
+          "minimum_tls_version": "1.3"
+         }
+        ],
+        "storage_access_key": "REDACTED",
+        "storage_authentication_type": "StorageAccountConnectionString",
+        "storage_container_endpoint": "https://eundstfuncmedia.blob.core.windows.net/flex-content"
+       }
+      }
+     ]
+    },
+    {
+     "address": "module.storage_account",
+     "resources": [
+      {
+       "address": "module.storage_account.azurerm_storage_account.this",
+       "name": "this",
+       "type": "azurerm_storage_account",
+       "values": {
+        "name": "eundstcontoso",
+        "primary_access_key": "REDACTED"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_container.this[\"catalog-docs\"]",
+       "index": "catalog-docs",
+       "name": "this",
+       "type": "azurerm_storage_container",
+       "values": {
+        "name": "catalog-docs",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_container.this[\"script-history\"]",
+       "index": "script-history",
+       "name": "this",
+       "type": "azurerm_storage_container",
+       "values": {
+        "name": "script-history",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_container.this[\"generated-media\"]",
+       "index": "generated-media",
+       "name": "this",
+       "type": "azurerm_storage_container",
+       "values": {
+        "name": "generated-media",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_container.this[\"orders-seed-artifacts\"]",
+       "index": "orders-seed-artifacts",
+       "name": "this",
+       "type": "azurerm_storage_container",
+       "values": {
+        "name": "orders-seed-artifacts",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_container.this[\"prompt-artifacts\"]",
+       "index": "prompt-artifacts",
+       "name": "this",
+       "type": "azurerm_storage_container",
+       "values": {
+        "name": "prompt-artifacts",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_table.this[\"AiModelSettings\"]",
+       "index": "AiModelSettings",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "AiModelSettings",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_table.this[\"CatalogItems\"]",
+       "index": "CatalogItems",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "CatalogItems",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_table.this[\"OrdersRuns\"]",
+       "index": "OrdersRuns",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "OrdersRuns",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_table.this[\"BillingRuns\"]",
+       "index": "BillingRuns",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "BillingRuns",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_table.this[\"BillingAttempts\"]",
+       "index": "BillingAttempts",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "BillingAttempts",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_table.this[\"OrdersDelta\"]",
+       "index": "OrdersDelta",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "OrdersDelta",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_table.this[\"BillingExamples\"]",
+       "index": "BillingExamples",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "BillingExamples",
+        "storage_account_name": "eundstcontoso"
+       }
+      },
+      {
+       "address": "module.storage_account.azurerm_storage_table.this[\"BillingCardsTable\"]",
+       "index": "BillingCardsTable",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "BillingCardsTable",
+        "storage_account_name": "eundstcontoso"
+       }
+      }
+     ]
+    },
+    {
+     "address": "module.catalog_storage",
+     "resources": [
+      {
+       "address": "module.catalog_storage.azurerm_storage_account.this",
+       "name": "this",
+       "type": "azurerm_storage_account",
+       "values": {
+        "name": "eundstcatalog",
+        "primary_access_key": "REDACTED"
+       }
+      },
+      {
+       "address": "module.catalog_storage.azurerm_storage_container.this[\"catalog-content\"]",
+       "index": "catalog-content",
+       "name": "this",
+       "type": "azurerm_storage_container",
+       "values": {
+        "name": "catalog-content",
+        "storage_account_name": "eundstcatalog"
+       }
+      },
+      {
+       "address": "module.catalog_storage.azurerm_storage_table.this[\"CatalogState\"]",
+       "index": "CatalogState",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "CatalogState",
+        "storage_account_name": "eundstcatalog"
+       }
+      },
+      {
+       "address": "module.catalog_storage.azurerm_storage_table.this[\"CatalogAudit\"]",
+       "index": "CatalogAudit",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "CatalogAudit",
+        "storage_account_name": "eundstcatalog"
+       }
+      },
+      {
+       "address": "module.catalog_storage.azurerm_storage_table.this[\"KnowledgeEntities\"]",
+       "index": "KnowledgeEntities",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "KnowledgeEntities",
+        "storage_account_name": "eundstcatalog"
+       }
+      },
+      {
+       "address": "module.catalog_storage.azurerm_storage_table.this[\"KnowledgeCatalogue\"]",
+       "index": "KnowledgeCatalogue",
+       "name": "this",
+       "type": "azurerm_storage_table",
+       "values": {
+        "name": "KnowledgeCatalogue",
+        "storage_account_name": "eundstcatalog"
+       }
+      }
+     ]
+    },
+    {
+     "address": "module.key_vault",
+     "resources": [
+      {
+       "address": "module.key_vault.azurerm_key_vault.this",
+       "name": "this",
+       "type": "azurerm_key_vault",
+       "values": {
+        "name": "eundkvcontoso"
+       }
+      }
+     ]
+    },
+    {
+     "address": "module.web_apps",
+     "resources": [
+      {
+       "address": "module.web_apps.azurerm_linux_web_app.this[\"frontend\"]",
+       "index": "frontend",
+       "name": "this",
+       "type": "azurerm_linux_web_app",
+       "values": {
+        "app_settings": {
+         "BACKEND_ORIGIN": "https://eund-app-contoso-backend.azurewebsites.net",
+         "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/auth-frontend-secret/)"
+        },
+        "auth_settings_v2": [
+         {
+          "auth_enabled": true
+         }
+        ],
+        "name": "eund-app-contoso-frontend",
+        "site_config": [
+         {
+          "app_command_line": "",
+          "application_stack": [
+           {
+            "docker_image_name": "contoso-web-frontend:latest",
+            "docker_registry_url": "https://example.azurecr.io"
+           }
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "address": "module.web_apps.azurerm_linux_web_app.this[\"backend\"]",
+       "index": "backend",
+       "name": "this",
+       "type": "azurerm_linux_web_app",
+       "values": {
+        "app_settings": {
+         "ADMIN_EMAILS": "admin@example.com",
+         "AI_MODEL_TABLE_ENDPOINT": "https://eundstcontoso.table.core.windows.net/",
+         "CATALOG_STORAGE_ACCOUNT_URL": "https://eundstcatalog.blob.core.windows.net/",
+         "LLM_API_KEY": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/API-KEY/)",
+         "LLM_BASE_URL": "https://example-openai.cognitiveservices.azure.com/openai/v1/",
+         "WAREHOUSE_ACCOUNT": "example-warehouse",
+         "WAREHOUSE_DATABASE": "EXAMPLE_DB",
+         "WAREHOUSE_PASSWORD": "@Microsoft.KeyVault(SecretUri=https://eundkvcontoso.vault.azure.net/secrets/WAREHOUSE-PASSWORD/)",
+         "WAREHOUSE_USER": "SVC_EXAMPLE",
+         "STORAGE_ACCOUNT_NAME": "eundstcontoso",
+         "ORDERS_FUNCTION_BASE_URL": "https://eund-func-orders.azurewebsites.net"
+        },
+        "auth_settings_v2": [],
+        "name": "eund-app-contoso-backend",
+        "site_config": [
+         {
+          "app_command_line": "",
+          "application_stack": [
+           {
+            "docker_image_name": "contoso-web-backend:latest",
+            "docker_registry_url": "https://example.azurecr.io"
+           }
+          ]
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "resource_changes": [
+  {
+   "address": "module.web_apps.azurerm_linux_web_app.this[\"backend\"]",
+   "change": {
+    "actions": [
+     "no-op"
+    ],
+    "after_unknown": {
+     "app_settings": {
+      "CATALOG_FUNCTION_BASE_URL": true
+     }
+    }
+   },
+   "type": "azurerm_linux_web_app"
+  }
+ ],
+ "terraform_version": "1.14.8"
+}

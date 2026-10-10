@@ -1,0 +1,40 @@
+{
+  "dir": "examples/complete",
+  "_comment": "libre-devops/terraform-azurerm-linux-function-app examples/complete (module root is ../../ ; registry modules libre-devops/{tags,rg,log-analytics-workspace,application-insights}/azurerm need network for terraform init). for_each over a map of optional()-typed objects keyed by the app name, dynamic blocks, provider::azurerm::parse_resource_id() of an unknown id, terraform.workspace=default. Storage names are substr('st'+key without dashes, 0, 24). Hand-written from the HCL; plan.json is the real terraform plan (app_settings are unknown there: they carry the user-assigned identity client id).",
+  "needs_network": true,
+  "apps": [
+    {
+      "name": "func-lapi-azm-uks-default-002",
+      "resource_type": "azurerm_linux_function_app",
+      "host": "functions",
+      "kind": "zip",
+      "runtime": "python",
+      "runtime_version": "3.12",
+      "host_storage": "stfunclapiazmuksdefault0",
+      "host_storage_mi": true,
+      "easy_auth": false,
+      "settings": {
+        "AzureWebJobsStorage__clientId": null,
+        "APPLICATIONINSIGHTS_CONNECTION_STRING": null,
+        "APPLICATIONINSIGHTS_AUTHENTICATION_STRING": "re:^ClientId=.*;Authorization=AAD$"
+      }
+    },
+    {
+      "name": "func-lwkr-azm-uks-default-002",
+      "resource_type": "azurerm_linux_function_app",
+      "host": "functions",
+      "kind": "zip",
+      "runtime": "node",
+      "runtime_version": "20",
+      "host_storage": "stfunclwkrazmuksdefault0",
+      "host_storage_mi": false,
+      "easy_auth": false,
+      "settings": {}
+    }
+  ],
+  "storage_accounts": [
+    {"name": "stfunclapiazmuksdefault0"},
+    {"name": "stfunclwkrazmuksdefault0"}
+  ],
+  "vaults": []
+}

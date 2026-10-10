@@ -1,0 +1,27 @@
+{
+  "_comment": "Azure-Samples/app-service-javascript-sap-cloud-sdk-quickstart infra-terraform. Names come from azurecaf_name over resource_token = substr(lower(base64encode(sha256(env+location+subscription_id))),0,13): not knowable without the subscription id, hence the regexes (azurecaf slugs: app, kv). module.apim has count = var.useAPIM (false) and reads files that are not in the corpus: it must be pruned without being evaluated. A real terraform plan leaves the web app name and the whole app_settings unknown (azurecaf result and vault_uri are computed), so there is no plan.json for this project.",
+  "apps": [
+    {
+      "name": "re:^app-sap-cloud-sdk-api-[a-z0-9]{13}$",
+      "resource_type": "azurerm_linux_web_app",
+      "host": "appservice",
+      "kind": "zip",
+      "runtime": "node",
+      "runtime_version": "18-lts",
+      "easy_auth": false,
+      "command_line": "",
+      "settings": {
+        "SCM_DO_BUILD_DURING_DEPLOYMENT": "true",
+        "AZURE_KEY_VAULT_ENDPOINT": "re:^https://kv-[a-z0-9]{13}[.]vault[.]azure[.]net/$",
+        "APPLICATIONINSIGHTS_CONNECTION_STRING": null,
+        "ODATA_URL": "https://sandbox.api.sap.com/s4hanacloud",
+        "ODATA_USERNAME": "odata-user",
+        "ODATA_USERPWD": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://kv-[a-z0-9]{13}[.]vault[.]azure[.]net/secrets/kv-secret-odata-password[)]$",
+        "APIKEY": "re:^@Microsoft[.]KeyVault[(]SecretUri=https://kv-[a-z0-9]{13}[.]vault[.]azure[.]net/secrets/kv-secret-apikey[)]$",
+        "APIKEY_HEADERNAME": "APIKey"
+      }
+    }
+  ],
+  "storage_accounts": [],
+  "vaults": ["re:^kv-[a-z0-9]{13}$"]
+}
