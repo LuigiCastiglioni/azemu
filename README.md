@@ -39,6 +39,21 @@ Other commands: `azemu status`, `azemu env <app>` (resolved settings, secrets ma
 
 Each app is served on `http://127.0.0.1:<port>` (ports in `.azemu/ports.json`, stable across runs), and inside the network on its real `https://<name>.azurewebsites.net`.
 
+## Pull real data into the emulator
+
+With the stack running (`azemu up`), copy named containers and tables from the real storage account into the emulated one of the same name:
+
+```
+azemu storage pull stmyapp --containers prompts,docs --prefix 2024/ --tables Settings
+azemu storage pull stmyapp --all          # every container and table
+```
+
+It reads the account key with your `az login` (`az storage account keys list`), the same path as the portal's "Access key" mode, so no data-plane RBAC is needed. The key is only held in memory. Blobs are streamed, overwritten, and skipped when size and Content-MD5 already match; table entities keep their types. Flags: `--subscription S`, `--env E`, `-f dir`, `--concurrency 8`.
+
+- Needs a role that can list keys (Contributor or Storage Account Key Operator): activate your PIM role first.
+- Real data lands on your laptop (the Azurite volume); `azemu down --volumes` wipes it.
+- Only what you name (or `--all`) is copied. Queues are not (ephemeral). Azure is only read, never written.
+
 ## How it works
 
 ```

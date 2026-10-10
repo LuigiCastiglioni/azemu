@@ -66,27 +66,27 @@ func createAccount(ctx context.Context, a infra.StorageAccount, opts azcore.Clie
 	}
 	for _, n := range a.Containers {
 		_, err = blob.CreateContainer(ctx, n, nil)
-		if err = ignoreExists(err); err != nil {
+		if err = IgnoreExists(err); err != nil {
 			return fmt.Errorf("container %s: %w", n, err)
 		}
 	}
 	for _, n := range a.Queues {
 		_, err = queue.CreateQueue(ctx, n, nil)
-		if err = ignoreExists(err); err != nil {
+		if err = IgnoreExists(err); err != nil {
 			return fmt.Errorf("queue %s: %w", n, err)
 		}
 	}
 	for _, n := range a.Tables {
 		_, err = table.CreateTable(ctx, n, nil)
-		if err = ignoreExists(err); err != nil {
+		if err = IgnoreExists(err); err != nil {
 			return fmt.Errorf("table %s: %w", n, err)
 		}
 	}
 	return nil
 }
 
-// ignoreExists maps HTTP 409 (ContainerAlreadyExists, TableAlreadyExists, QueueAlreadyExists) to nil.
-func ignoreExists(err error) error {
+// IgnoreExists maps HTTP 409 (ContainerAlreadyExists, TableAlreadyExists, QueueAlreadyExists) to nil.
+func IgnoreExists(err error) error {
 	var re *azcore.ResponseError
 	if errors.As(err, &re) && re.StatusCode == http.StatusConflict {
 		return nil
