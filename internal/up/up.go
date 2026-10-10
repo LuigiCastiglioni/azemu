@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -125,15 +126,15 @@ func Run(ctx context.Context, o Options) error {
 		return err
 	}
 	ph.add("preflight", t0)
-	if err := stack.WriteBuildCompose(cfg, env, proxyImage); err != nil {
-		return err
-	}
 	header, err := identityHeader(cfg)
 	if err != nil {
 		return err
 	}
 	ports, err := assignPorts(cfg.StatePath("ports.json"), slices.Sorted(maps.Keys(cfg.Apps)))
 	if err != nil {
+		return err
+	}
+	if err := stack.WriteBuildCompose(cfg, env, proxyImage, ports[contract.LogsPortKey]); err != nil {
 		return err
 	}
 	keys := slices.Sorted(maps.Keys(cfg.Apps))
@@ -163,7 +164,7 @@ func Run(ctx context.Context, o Options) error {
 		if err := writeJSON(cfg.StatePath("proxy.json"), pc); err != nil {
 			return err
 		}
-		if err := stack.WriteCompose(cfg, m, env, pc, proxyImage); err != nil {
+		if err := stack.WriteCompose(cfg, m, env, pc, proxyImage, ports[contract.LogsPortKey]); err != nil {
 			return err
 		}
 		t = time.Now()
@@ -194,6 +195,17 @@ func Run(ctx context.Context, o Options) error {
 		return nil
 	})
 
+	// [D] log dashboard: independent of everything else, so it shows startup logs; a failure only warns.
+	// [C] waits for it, so two `compose up` never create the project network at once.
+	logsUp := make(chan struct{})
+	g.Go(func() error {
+		defer close(logsUp)
+		if err := stack.UpLogs(gctx, cfg); err != nil && gctx.Err() == nil {
+			fmt.Fprintln(os.Stderr, "warning: logs dashboard did not start:", err)
+		}
+		return nil
+	})
+
 	// [C] CA + proxy + azurite, then storage objects and seeds.
 	g.Go(func() error {
 		select {
@@ -201,6 +213,7 @@ func Run(ctx context.Context, o Options) error {
 		case <-gctx.Done():
 			return gctx.Err()
 		}
+		<-logsUp
 		t := time.Now()
 		caPEM, err := proxy.EnsureCA(contract.HostCADir())
 		if err != nil {
@@ -362,7 +375,9 @@ func identityHeader(cfg *config.Config) (string, error) {
 }
 
 // assignPorts returns a host ingress port per key, persisted in path: known keys keep theirs, new ones get the next free.
-// ponytail: assumes the ports are free on the host; a busy port surfaces as a compose error (azemu doctor checks).
+// The logs dashboard gets the reserved key contract.LogsPortKey: 7000 when free, else a free port picked by the OS.
+// ponytail: app ports are assumed free on the host (a busy one surfaces as a compose error, azemu doctor checks);
+// a persisted logs port taken later by another process only warns at `up`.
 func assignPorts(path string, keys []string) (map[string]int, error) {
 	ports := map[string]int{}
 	if b, err := os.ReadFile(path); err == nil {
@@ -375,6 +390,10 @@ func assignPorts(path string, keys []string) (map[string]int, error) {
 		used[p] = true
 	}
 	changed := false
+	if _, ok := ports[contract.LogsPortKey]; !ok {
+		p := freePort(contract.LogsPort)
+		ports[contract.LogsPortKey], used[p], changed = p, true, true
+	}
 	for _, k := range keys {
 		if _, ok := ports[k]; ok {
 			continue
@@ -389,6 +408,17 @@ func assignPorts(path string, keys []string) (map[string]int, error) {
 		return ports, writeJSON(path, ports)
 	}
 	return ports, nil
+}
+
+// freePort returns want when it can be bound on localhost, else any free port.
+func freePort(want int) int {
+	for _, a := range []string{fmt.Sprintf("127.0.0.1:%d", want), "127.0.0.1:0"} {
+		if l, err := net.Listen("tcp", a); err == nil {
+			defer l.Close()
+			return l.Addr().(*net.TCPAddr).Port
+		}
+	}
+	return want
 }
 
 func writeJSON(path string, v any) error {
@@ -630,6 +660,9 @@ func printStatus(ctx context.Context, cfg *config.Config, env string, ports map[
 		fmt.Fprintf(tw, "%s\t%s.azurewebsites.net\t%s\t%s\t%s\n", k, cfg.ResourceName(k, env), url, state, bt)
 	}
 	tw.Flush()
+	if p := ports[contract.LogsPortKey]; p > 0 {
+		fmt.Printf("\nLogs dashboard: http://127.0.0.1:%d\n", p)
+	}
 }
 
 // Status is `azemu status`.

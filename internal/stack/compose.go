@@ -41,7 +41,21 @@ func ProjectName(cfg *config.Config) string { return "azemu-" + slug(cfg) }
 type composeFile struct {
 	Services map[string]*service `yaml:"services"`
 	Volumes  map[string]struct{} `yaml:"volumes"`
+	Configs  map[string]inline   `yaml:"configs,omitempty"`
 }
+
+type inline struct {
+	Content string `yaml:"content"`
+}
+
+// dozzleImage is pinned: the newest stable release at least two weeks old, with linux/amd64 and linux/arm64 manifests.
+const dozzleImage = "amir20/dozzle:v11.1.1"
+
+// dozzleProfile is Dozzle's default UI profile: keep stopped containers listed so a crashed app's last logs stay visible.
+const dozzleProfile = `{"settings":{"showAllContainers":true}}`
+
+// name is the label Dozzle shows instead of the compose container name (<project>-<service>-1).
+func name(n string) map[string]string { return map[string]string{"dev.dozzle.name": n} }
 
 type service struct {
 	Image       string              `yaml:"image"`
@@ -56,6 +70,13 @@ type service struct {
 	DependsOn   map[string]dep      `yaml:"depends_on,omitempty"`
 	Healthcheck *healthcheck        `yaml:"healthcheck,omitempty"`
 	Restart     string              `yaml:"restart,omitempty"`
+	Labels      map[string]string   `yaml:"labels,omitempty"`
+	Configs     []fileConfig        `yaml:"configs,omitempty"`
+}
+
+type fileConfig struct {
+	Source string `yaml:"source"`
+	Target string `yaml:"target"`
 }
 
 type buildSpec struct {
@@ -79,9 +100,9 @@ type healthcheck struct {
 	Retries  int      `yaml:"retries"`
 }
 
-// Compose renders the compose project: proxy, azurite and one service per app.
+// Compose renders the compose project: proxy, azurite, the Dozzle log dashboard and one service per app.
 // It calls build.Prepare for every app, which may write generated Dockerfiles.
-func Compose(cfg *config.Config, m *infra.Model, env string, pc *contract.ProxyConfig, proxyImage string) ([]byte, error) {
+func Compose(cfg *config.Config, m *infra.Model, env string, pc *contract.ProxyConfig, proxyImage string, logsPort int) ([]byte, error) {
 	certs := contract.CertsVolume + ":" + contract.CertsDir + ":ro"
 	healthy := dep{"service_healthy"}
 
@@ -90,6 +111,7 @@ func Compose(cfg *config.Config, m *infra.Model, env string, pc *contract.ProxyC
 		Command: []string{"proxy", "--config", contract.ProxyConfigPath},
 		// proxy.json is bind-mounted and read once at startup; a hash in the env makes compose recreate the proxy when it changes.
 		Environment: map[string]string{"AZEMU_CONFIG_HASH": configHash(pc)},
+		Labels:      name("proxy"),
 		Volumes: []string{
 			cfg.StatePath("proxy.json") + ":" + contract.ProxyConfigPath + ":ro",
 			contract.HostCADir() + ":" + contract.ProxyCADir,
@@ -119,6 +141,7 @@ func Compose(cfg *config.Config, m *infra.Model, env string, pc *contract.ProxyC
 			"--skipApiVersionCheck", "--loose", "--location", "/data"},
 		Environment: map[string]string{"AZURITE_ACCOUNTS": azuriteAccounts(m)},
 		Volumes:     []string{certs, "azurite-data:/data"},
+		Labels:      name("azurite"),
 		Ports: []string{
 			fmt.Sprintf("127.0.0.1:%d:%d", contract.AzuriteBlobPort, contract.AzuriteBlobPort),
 			fmt.Sprintf("127.0.0.1:%d:%d", contract.AzuriteQueuePort, contract.AzuriteQueuePort),
@@ -132,9 +155,26 @@ func Compose(cfg *config.Config, m *infra.Model, env string, pc *contract.ProxyC
 		},
 	}
 
+	// Read-only log viewer for this project's containers only. No depends_on: it starts first and shows startup and crash logs.
+	// Actions and shell stay off (Dozzle's default) and the socket is mounted read-only.
+	logs := &service{
+		Image: dozzleImage,
+		Environment: map[string]string{
+			"DOZZLE_FILTER":             "label=com.docker.compose.project=" + ProjectName(cfg),
+			"DOZZLE_HOSTNAME":           ProjectName(cfg),
+			"DOZZLE_NO_ANALYTICS":       "true",
+			"DOZZLE_RELEASE_CHECK_MODE": "manual",
+		},
+		Volumes: []string{"/var/run/docker.sock:/var/run/docker.sock:ro"},
+		Ports:   []string{fmt.Sprintf("127.0.0.1:%d:8080", logsPort)},
+		Labels:  name("logs"),
+		Configs: []fileConfig{{Source: "dozzle-profile", Target: "/data/__default__/profile.json"}},
+	}
+
 	cf := composeFile{
-		Services: map[string]*service{contract.ProxyService: proxy, contract.AzuriteService: azurite},
+		Services: map[string]*service{contract.ProxyService: proxy, contract.AzuriteService: azurite, contract.LogsService: logs},
 		Volumes:  map[string]struct{}{contract.CertsVolume: {}, "azurite-data": {}},
+		Configs:  map[string]inline{"dozzle-profile": {dozzleProfile}},
 	}
 	for key, app := range cfg.Apps {
 		ctxDir, dockerfile, err := build.Prepare(cfg, key)
@@ -153,6 +193,7 @@ func Compose(cfg *config.Config, m *infra.Model, env string, pc *contract.ProxyC
 			Volumes:   []string{certs},
 			DependsOn: map[string]dep{contract.ProxyService: healthy, contract.AzuriteService: healthy},
 			Restart:   "no",
+			Labels:    name(key),
 		}
 	}
 	return yaml.Marshal(cf) // yaml.v3 sorts map keys, so output is deterministic
@@ -183,8 +224,8 @@ func azuriteAccounts(m *infra.Model) string {
 }
 
 // WriteCompose renders the project and writes <StateDir>/compose.yaml, skipping the write when unchanged.
-func WriteCompose(cfg *config.Config, m *infra.Model, env string, pc *contract.ProxyConfig, proxyImage string) error {
-	b, err := Compose(cfg, m, env, pc, proxyImage)
+func WriteCompose(cfg *config.Config, m *infra.Model, env string, pc *contract.ProxyConfig, proxyImage string, logsPort int) error {
+	b, err := Compose(cfg, m, env, pc, proxyImage, logsPort)
 	if err != nil {
 		return err
 	}
@@ -193,8 +234,8 @@ func WriteCompose(cfg *config.Config, m *infra.Model, env string, pc *contract.P
 
 // WriteBuildCompose writes <StateDir>/compose.build.yaml: the apps with an empty model and proxy config.
 // Builds need neither, so they can start before the terraform plan finishes.
-func WriteBuildCompose(cfg *config.Config, env, proxyImage string) error {
-	b, err := Compose(cfg, &infra.Model{}, env, &contract.ProxyConfig{}, proxyImage)
+func WriteBuildCompose(cfg *config.Config, env, proxyImage string, logsPort int) error {
+	b, err := Compose(cfg, &infra.Model{}, env, &contract.ProxyConfig{}, proxyImage, logsPort)
 	if err != nil {
 		return err
 	}
@@ -270,6 +311,16 @@ func Build(ctx context.Context, cfg *config.Config, services ...string) error {
 // Up starts services (all when none given), waiting for healthy. Images must already be built.
 func Up(ctx context.Context, cfg *config.Config, services ...string) error {
 	return quiet(ctx, cfg, append([]string{"up", "-d", "--wait", "--no-build"}, services...)...)
+}
+
+// UpLogs starts the log dashboard from compose.build.yaml (written before the plan), without waiting: it has no dependencies.
+func UpLogs(ctx context.Context, cfg *config.Config) error {
+	var buf bytes.Buffer
+	err := composeIn(ctx, cfg, "compose.build.yaml", &buf, "up", "-d", "--no-build", contract.LogsService)
+	if err != nil {
+		prefixed(os.Stderr).Write(buf.Bytes())
+	}
+	return err
 }
 
 // UpNoDeps is Up for an app-only refresh: dependencies (proxy, azurite) are left alone.

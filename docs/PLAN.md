@@ -231,6 +231,7 @@ The environment for each app is built in this order, with later layers overridin
 | `azemu status` | Table of each app's Azure hostname, local URL, state, last build time and duration |
 | `azemu env <app> [--show-secrets]` | The resolved settings for one app |
 | `azemu logs [app…]` | `docker compose logs -f` |
+| (part of `up`) | Also starts `azemu-logs` (Dozzle, read-only, filtered to the project, no `depends_on`) on `127.0.0.1:7000` (`_logs` in `ports.json`); `up` and `status` print its URL |
 | `azemu down [--volumes]` | Stop the stack; `--volumes` also wipes Azurite data |
 | `azemu seed` | Run the seed steps again |
 | `azemu secrets init` | Write the missing secret names into `.env` |

@@ -14,6 +14,7 @@ const (
 	// Docker compose service names.
 	ProxyService   = "azemu-proxy"
 	AzuriteService = "azurite"
+	LogsService    = "azemu-logs" // Dozzle log dashboard
 
 	// Inside every container: shared volume written by the proxy at startup.
 	CertsDir      = "/azemu/certs"
@@ -32,6 +33,8 @@ const (
 	IdentityPort    = 8081
 	IdentityPath    = "/msi/token"
 	IngressBasePort = 7001       // first host port for app ingress
+	LogsPort        = 7000       // preferred host port of the logs dashboard
+	LogsPortKey     = "_logs"    // its key in ports.json, next to the app keys
 	ProxyHealthPath = "/healthz" // served on IdentityPort
 
 	// Azurite ports.

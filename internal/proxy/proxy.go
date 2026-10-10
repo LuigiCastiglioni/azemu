@@ -158,12 +158,12 @@ type statusWriter struct {
 func (s *statusWriter) WriteHeader(c int)           { s.status = c; s.ResponseWriter.WriteHeader(c) }
 func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
-// logged writes one line per request: host path status ms.
+// logged writes one greppable line per request: METHOD host path status ms.
 func logged(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sw := &statusWriter{ResponseWriter: w, status: 200}
 		t := time.Now()
 		next.ServeHTTP(sw, r)
-		log.Printf("%s %s %d %dms", r.Host, r.URL.Path, sw.status, time.Since(t).Milliseconds())
+		log.Printf("%s %s %s %d %dms", r.Method, r.Host, r.URL.Path, sw.status, time.Since(t).Milliseconds())
 	})
 }

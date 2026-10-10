@@ -31,7 +31,7 @@ func TestCompose(t *testing.T) {
 		Routes:  map[string]string{"sta.blob.core.windows.net": "https://azurite:10000", "eund-func-a.azurewebsites.net": "http://func-a:80"},
 		Ingress: []contract.Ingress{{Port: 7001, Upstream: "http://func-a:80"}, {Port: 7002, Upstream: "http://web:80"}},
 	}
-	got, err := Compose(cfg, m, "dev", pc, "azemu-proxy:dev")
+	got, err := Compose(cfg, m, "dev", pc, "azemu-proxy:dev", 7000)
 	if err != nil {
 		t.Fatal(err)
 	}

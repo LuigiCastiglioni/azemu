@@ -1,4 +1,20 @@
 services:
+    azemu-logs:
+        image: amir20/dozzle:v11.1.1
+        environment:
+            DOZZLE_FILTER: label=com.docker.compose.project=azemu-demo-app
+            DOZZLE_HOSTNAME: azemu-demo-app
+            DOZZLE_NO_ANALYTICS: "true"
+            DOZZLE_RELEASE_CHECK_MODE: manual
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        ports:
+            - 127.0.0.1:7000:8080
+        labels:
+            dev.dozzle.name: logs
+        configs:
+            - source: dozzle-profile
+              target: /data/__default__/profile.json
     azemu-proxy:
         image: azemu-proxy:dev
         command:
@@ -28,6 +44,8 @@ services:
             interval: 2s
             timeout: 3s
             retries: 30
+        labels:
+            dev.dozzle.name: proxy
     azurite:
         image: mcr.microsoft.com/azure-storage/azurite
         command:
@@ -69,6 +87,8 @@ services:
             interval: 2s
             timeout: 3s
             retries: 30
+        labels:
+            dev.dozzle.name: azurite
     func-a:
         image: azemu/demo-app-func-a:dev
         build:
@@ -86,6 +106,8 @@ services:
             azurite:
                 condition: service_healthy
         restart: "no"
+        labels:
+            dev.dozzle.name: func-a
     web:
         image: azemu/demo-app-web:dev
         build:
@@ -103,6 +125,11 @@ services:
             azurite:
                 condition: service_healthy
         restart: "no"
+        labels:
+            dev.dozzle.name: web
 volumes:
     azemu-certs: {}
     azurite-data: {}
+configs:
+    dozzle-profile:
+        content: '{"settings":{"showAllContainers":true}}'

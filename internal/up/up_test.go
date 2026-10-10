@@ -24,6 +24,9 @@ func TestAssignPortsStable(t *testing.T) {
 	if c["c"] != a["c"] {
 		t.Fatalf("subset: %v", c)
 	}
+	if lp := c[contract.LogsPortKey]; lp == 0 || lp != a[contract.LogsPortKey] || lp == c["c"] {
+		t.Fatalf("logs port must be stable and distinct: %v", c)
+	}
 }
 
 func TestProxyConfigRoutes(t *testing.T) {

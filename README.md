@@ -39,6 +39,12 @@ Other commands: `azemu status`, `azemu env <app>` (resolved settings, secrets ma
 
 Each app is served on `http://127.0.0.1:<port>` (ports in `.azemu/ports.json`, stable across runs), and inside the network on its real `https://<name>.azurewebsites.net`.
 
+## Logs dashboard
+
+`azemu up` also starts [Dozzle](https://dozzle.dev) (read-only, no start/stop/shell actions) and prints `Logs dashboard: http://127.0.0.1:7000` under the status table; `azemu status` prints it too. It shows only this project's containers, named by their app key (`func-writer`, `web-backend`, `proxy`, `azurite`, `logs`), with live tail, search, level highlighting and JSON pretty-printing. Select all containers (or open the stack group) for one merged, colour-coded stream; the proxy logs one `METHOD host path status ms` line per request, handy for tracing calls between services. Stopped containers stay listed, so a crashed app's last logs remain readable.
+
+The port is 7000 when free (else a free one is picked), kept in `.azemu/ports.json` under `_logs`. If the dashboard fails to start, `up` only warns.
+
 ## Pull real data into the emulator
 
 With the stack running (`azemu up`), copy named containers and tables from the real storage account into the emulated one of the same name:
