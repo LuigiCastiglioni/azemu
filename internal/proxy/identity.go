@@ -40,14 +40,21 @@ func uuid() string {
 }
 
 // token mints an RS256 JWT for aud. ponytail: signature is never verified by Azurite (--oauth basic); the key is just for a well-formed JWT.
-func (id *identity) token(aud string) (string, error) {
+func (id *identity) token(aud string) (string, error) { return id.mint(aud, nil) }
+
+// mint is token plus extra claims.
+func (id *identity) mint(aud string, extra map[string]any) (string, error) {
 	now := id.now()
 	hdr, _ := json.Marshal(map[string]string{"alg": "RS256", "typ": "JWT", "kid": "azemu"})
-	claims, _ := json.Marshal(map[string]any{
+	c := map[string]any{
 		"aud": aud, "iss": "https://sts.windows.net/" + contract.TenantID + "/",
 		"tid": contract.TenantID, "oid": id.oid, "sub": id.oid, "appid": id.oid, "idtyp": "app",
 		"iat": now.Unix(), "nbf": now.Unix(), "exp": now.Add(time.Hour).Unix(),
-	})
+	}
+	for k, v := range extra {
+		c[k] = v
+	}
+	claims, _ := json.Marshal(c)
 	enc := base64.RawURLEncoding
 	signing := enc.EncodeToString(hdr) + "." + enc.EncodeToString(claims)
 	sum := sha256.Sum256([]byte(signing))

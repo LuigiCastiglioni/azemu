@@ -125,11 +125,15 @@ func Compose(cfg *config.Config, m *infra.Model, env string, pc *contract.ProxyC
 	for _, in := range pc.Ingress {
 		proxy.Ports = append(proxy.Ports, fmt.Sprintf("127.0.0.1:%d:%d", in.Port, in.Port))
 	}
-	if len(pc.Routes) > 0 {
-		aliases := make([]string, 0, len(pc.Routes))
-		for h := range pc.Routes {
-			aliases = append(aliases, h)
-		}
+	aliases := make([]string, 0, len(pc.Routes)+2)
+	for h := range pc.Routes {
+		aliases = append(aliases, h)
+	}
+	if pc.Graph != nil {
+		aliases = append(aliases, contract.GraphHost, contract.LoginHost)
+		proxy.Volumes = append(proxy.Volumes, cfg.StatePath("graph")+":"+contract.GraphDir)
+	}
+	if len(aliases) > 0 {
 		sort.Strings(aliases)
 		proxy.Networks = map[string]netAlias{"default": {aliases}}
 	}

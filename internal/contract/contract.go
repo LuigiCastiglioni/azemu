@@ -28,6 +28,11 @@ const (
 	ProxyConfigPath = "/azemu/proxy.json" // bind-mounted from <StateDir>/proxy.json
 	ProxyCADir      = "/azemu/ca"         // bind-mounted from ~/.azemu/ca (persistent root CA)
 
+	// Delegated Microsoft Graph (see internal/graph): the proxy answers these two hosts itself.
+	GraphHost = "graph.microsoft.com"
+	LoginHost = "login.microsoftonline.com"
+	GraphDir  = "/azemu/graph" // bind-mounted read-write from <StateDir>/graph (holds the user's refresh token)
+
 	// Proxy ports (inside the network).
 	ProxyTLSPort    = 443
 	IdentityPort    = 8081

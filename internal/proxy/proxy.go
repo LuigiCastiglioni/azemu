@@ -13,12 +13,14 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/luigi23997/azemu/internal/contract"
+	"github.com/luigi23997/azemu/internal/graph"
 )
 
 const systemBundle = "/etc/ssl/certs/ca-certificates.crt"
@@ -55,6 +57,12 @@ func Run(configPath string) error {
 	pool.AppendCertsFromPEM(c.pem)
 	tr := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}, MaxIdleConnsPerHost: 32, IdleConnTimeout: 90 * time.Second}
 
+	own := map[string]http.Handler{} // hosts the proxy answers itself instead of forwarding to a container
+	if cfg.Graph != nil {
+		g := newGraphGate(id, cfg.Graph.ReadOnly, filepath.Join(contract.GraphDir, graph.TokenFile))
+		own[contract.LoginHost], own[contract.GraphHost] = g.loginHandler(), g.graphHandler()
+	}
+
 	errc := make(chan error, 2+len(cfg.Ingress))
 	serve := func(s *http.Server, tlsMode bool) {
 		if tlsMode {
@@ -66,7 +74,7 @@ func Run(configPath string) error {
 	go serve(&http.Server{Addr: ":" + strconv.Itoa(contract.IdentityPort), Handler: id.handler()}, false)
 	go serve(&http.Server{
 		Addr:      ":" + strconv.Itoa(contract.ProxyTLSPort),
-		Handler:   logged(routeHandler(cfg.Routes, tr)),
+		Handler:   logged(routeHandler(cfg.Routes, tr, own)),
 		TLSConfig: &tls.Config{GetCertificate: c.getCertificate},
 	}, true)
 	for _, ing := range cfg.Ingress {
@@ -101,12 +109,15 @@ func newProxy(target *url.URL, host string, tr http.RoundTripper, edit func(*htt
 	}
 }
 
-func routeHandler(routes map[string]string, tr http.RoundTripper) http.Handler {
-	proxies := map[string]*httputil.ReverseProxy{}
+func routeHandler(routes map[string]string, tr http.RoundTripper, own map[string]http.Handler) http.Handler {
+	proxies := map[string]http.Handler{}
 	for host, up := range routes {
 		if u, err := url.Parse(up); err == nil {
 			proxies[strings.ToLower(host)] = newProxy(u, "", tr, nil)
 		}
+	}
+	for host, h := range own {
+		proxies[host] = h
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host

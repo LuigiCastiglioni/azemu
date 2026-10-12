@@ -17,7 +17,8 @@ type Config struct {
 	Infra    Infra           `yaml:"infra"`
 	Secrets  string          `yaml:"secrets,omitempty"` // path to .env, may contain {env}; default ".env"
 	Identity Identity        `yaml:"identity,omitempty"`
-	Apps     map[string]*App `yaml:"apps"` // key = local app name (folder basename), stable across envs
+	Graph    *Graph          `yaml:"graph,omitempty"` // present = apps calling Microsoft Graph run with your own delegated login
+	Apps     map[string]*App `yaml:"apps"`            // key = local app name (folder basename), stable across envs
 	Seed     []Seed          `yaml:"seed,omitempty"`
 
 	Root string `yaml:"-"` // directory containing azemu.yaml; all relative paths resolve against it
@@ -37,6 +38,14 @@ type Infra struct {
 
 type Identity struct {
 	As string `yaml:"as,omitempty"` // Easy Auth principal name; default: git config user.email
+}
+
+// Graph configures `azemu graph login`; every field has a default, so `graph: {}` is enough.
+type Graph struct {
+	Tenant   string   `yaml:"tenant,omitempty"`    // default "organizations"
+	ClientID string   `yaml:"client_id,omitempty"` // public client used to sign in; default Microsoft Graph Command Line Tools
+	Scopes   []string `yaml:"scopes,omitempty"`    // delegated scopes; default Sites.Read.All, Files.Read.All
+	Writable bool     `yaml:"writable,omitempty"`  // default false: the proxy rejects writes to Graph
 }
 
 type App struct {

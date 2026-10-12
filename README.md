@@ -77,13 +77,28 @@ azemu CLI (Go)                         azemu-proxy  (aliases: every emulated hos
 Settings are not rewritten: real Azure hostnames resolve to the proxy inside the network and the local CA is trusted. Key Vault references are replaced from `.env`, storage keys by the Azurite key, App Insights is blanked.
 `up` runs plan, image builds and platform startup concurrently; a failed build of one app does not stop the others, and in watch mode a failed rebuild leaves the old container serving. Warm `up` (cached images and plan) takes seconds.
 
+## Microsoft Graph with your own login
+
+If an app calls Graph (SharePoint, OneDrive...) with an app registration (`ClientSecretCredential`, client id + secret), add `graph: {}` to `azemu.yaml` and run `azemu graph login` once (device code). The app is unchanged: azemu answers its client-credentials request for `https://graph.microsoft.com/.default` with a fake token, then swaps in **your** delegated token on `graph.microsoft.com`. Token requests for any other resource go to the real Entra untouched, and the client secret is never used.
+
+```yaml
+graph:
+  scopes: [Sites.Read.All, Files.Read.All]   # default; delegated scopes asked at login
+  writable: false                            # default: POST/PATCH/PUT/DELETE are rejected (reads, search/query and GET-only $batch pass)
+  # tenant: organizations   client_id: <public client; default: Microsoft Graph Command Line Tools>
+```
+
+`azemu graph status` shows the signed-in account. The refresh token lives in `.azemu/graph/` (mode 0600). A tenant may block the default client id for consent; then register your own public client with delegated permissions and set `client_id`. `azemu logs azemu-proxy` shows every Graph call (`grep graph.microsoft.com`).
+
+Delegated is not app-only: you get your own access, so missing app role grants, admin consent and `Sites.Selected` grants are not caught, and `/me` works here but not in Azure.
+
 ## What it can't catch
 
 - RBAC: the fake identity can do anything on emulated storage, so missing role assignments will not show up.
 - VNet, private endpoints, firewalls, DNS.
 - Easy Auth token validation: the proxy injects the headers for `--as`; it does not run the Entra flow.
 - Cold start, scaling, quotas, Windows plans, Flex Consumption specifics.
-- External services (OpenAI, data warehouses, Graph...) are real and called as-is.
+- External services (OpenAI, data warehouses...) are real and called as-is; Graph is too, with your login (see above).
 
 ## Current limits
 

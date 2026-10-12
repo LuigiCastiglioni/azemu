@@ -28,6 +28,7 @@ import (
 	"github.com/luigi23997/azemu/internal/build"
 	"github.com/luigi23997/azemu/internal/config"
 	"github.com/luigi23997/azemu/internal/contract"
+	"github.com/luigi23997/azemu/internal/graph"
 	"github.com/luigi23997/azemu/internal/infra"
 	"github.com/luigi23997/azemu/internal/proxy"
 	"github.com/luigi23997/azemu/internal/settings"
@@ -161,6 +162,9 @@ func Run(ctx context.Context, o Options) error {
 		}
 		warnMismatch(cfg, m, env)
 		pc := proxyConfig(cfg, m, env, ports, header, principalFor(cfg, o.As))
+		if err := prepareGraph(cfg); err != nil {
+			return err
+		}
 		if err := writeJSON(cfg.StatePath("proxy.json"), pc); err != nil {
 			return err
 		}
@@ -497,7 +501,24 @@ func proxyConfig(cfg *config.Config, m *infra.Model, env string, ports map[strin
 			pc.Routes[fmt.Sprintf("%s.%s.core.windows.net", a, svc)] = fmt.Sprintf("https://%s:%d", contract.AzuriteService, port)
 		}
 	}
+	if cfg.Graph != nil {
+		pc.Graph = &contract.Graph{ReadOnly: !cfg.Graph.Writable}
+	}
 	return pc
+}
+
+// prepareGraph creates the token directory (so docker does not create it as root) and warns when nobody has logged in yet.
+func prepareGraph(cfg *config.Config) error {
+	if cfg.Graph == nil {
+		return nil
+	}
+	if err := os.MkdirAll(cfg.StatePath("graph"), 0o700); err != nil {
+		return err
+	}
+	if _, err := os.Stat(cfg.StatePath("graph", graph.TokenFile)); err != nil {
+		fmt.Fprintln(os.Stderr, "warning: graph is configured but not signed in: run `azemu graph login`")
+	}
+	return nil
 }
 
 func warnMismatch(cfg *config.Config, m *infra.Model, env string) {

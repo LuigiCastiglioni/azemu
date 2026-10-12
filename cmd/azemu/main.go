@@ -23,6 +23,7 @@ Commands:
   secrets   'secrets init' writes missing Key Vault secret names into .env
   doctor    check prerequisites
   storage   'storage pull <account>' copies selected real containers/tables into the emulator
+  graph     'graph login' signs you in so apps using a Graph app registration run with your own access
   infra     'infra show' prints the infra model; 'infra verify' diffs static vs terraform plan
   proxy     (internal) run the in-network proxy
   version   print version
@@ -36,7 +37,7 @@ func main() {
 	cmds := map[string]func([]string) error{
 		"init": runInit, "up": runUp, "down": runDown, "status": runStatus,
 		"env": runEnv, "logs": runLogs, "seed": runSeed, "secrets": runSecrets, "storage": runStorage,
-		"doctor": runDoctor, "proxy": runProxy, "infra": runInfra,
+		"doctor": runDoctor, "graph": runGraph, "proxy": runProxy, "infra": runInfra,
 		"version": func([]string) error { fmt.Println(version); return nil },
 	}
 	cmd, ok := cmds[os.Args[1]]

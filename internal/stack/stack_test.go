@@ -47,6 +47,20 @@ func TestCompose(t *testing.T) {
 	}
 }
 
+func TestComposeGraph(t *testing.T) {
+	cfg := &config.Config{Root: "/p/demo", Graph: &config.Graph{}}
+	pc := &contract.ProxyConfig{Graph: &contract.Graph{ReadOnly: true}}
+	got, err := Compose(cfg, &infra.Model{}, "dev", pc, "azemu-proxy:dev", 7000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"- graph.microsoft.com", "- login.microsoftonline.com", "/p/demo/.azemu/graph:" + contract.GraphDir} {
+		if !strings.Contains(string(got), want) {
+			t.Errorf("compose lacks %q:\n%s", want, got)
+		}
+	}
+}
+
 func TestProjectName(t *testing.T) {
 	for in, want := range map[string]string{"/x/contoso.local": "azemu-contoso-local", "/x/My App_2": "azemu-my-app_2", "/": "azemu-project"} {
 		if got := ProjectName(&config.Config{Root: in}); got != want {
