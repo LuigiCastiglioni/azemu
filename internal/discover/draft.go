@@ -125,8 +125,8 @@ func (d *Proposal) Render() ([]byte, error) {
 }
 
 // MergeInto adds the draft to an existing azemu.yaml (--update): new apps are appended with
-// their source comment; for known apps only the missing env resource name is added. Every
-// other manual field and comment is kept.
+// their source comment; for known apps the missing env resource name and the missing run/host_header
+// (docker apps) are added. Every other manual field and comment is kept.
 func (d *Proposal) MergeInto(existing []byte, env string) ([]byte, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(existing, &doc); err != nil {
@@ -157,8 +157,16 @@ func (d *Proposal) MergeInto(existing []byte, env string) ([]byte, error) {
 			apps.Content = append(apps.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: k, HeadComment: d.Comments[k]}, &v)
 			continue
 		}
+		if old.Kind != yaml.MappingNode {
+			continue
+		}
+		for _, f := range [][2]string{{"run", a.Run}, {"host_header", a.HostHeader}} {
+			if f[1] != "" && mapGet(old, f[0]) == nil {
+				old.Content = append(old.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: f[0]}, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: f[1]})
+			}
+		}
 		name := a.Resource[env]
-		if name == "" || old.Kind != yaml.MappingNode {
+		if name == "" {
 			continue
 		}
 		res := mapGet(old, "resource")

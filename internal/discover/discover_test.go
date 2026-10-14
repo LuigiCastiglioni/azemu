@@ -381,6 +381,28 @@ apps:
 	}
 }
 
+func TestMergeIntoAddsMissingRun(t *testing.T) {
+	d := &Proposal{Config: &config.Config{Apps: map[string]*config.App{
+		"web": {Path: "apps/web", Kind: "docker", Run: "npm run dev -- --port {port}", HostHeader: "local"},
+		"api": {Path: "apps/api", Kind: "docker", Run: "derived"},
+	}}}
+	existing := "env: dev\napps:\n  web:\n    path: apps/web\n    kind: docker\n  api:\n    path: apps/api\n    kind: docker\n    run: mine\n"
+	b, err := d.MergeInto([]byte(existing), "dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c config.Config
+	if err := yaml.Unmarshal(b, &c); err != nil {
+		t.Fatal(err)
+	}
+	if w := c.Apps["web"]; w.Run != "npm run dev -- --port {port}" || w.HostHeader != "local" {
+		t.Errorf("web = %+v", w)
+	}
+	if c.Apps["api"].Run != "mine" {
+		t.Errorf("an existing run must be kept, got %q", c.Apps["api"].Run)
+	}
+}
+
 func TestDraftUnmatched(t *testing.T) {
 	d := Draft(t.TempDir(), "dev", config.Infra{}, MatchResult{Unmatched: []Finding{
 		{Path: "apps/known", AppName: "known-dev", Kind: "zip", Source: "p.yml:1 x", Confidence: "medium"},
