@@ -21,6 +21,7 @@ func runInit(args []string) error {
 	infraPath := fs.String("infra", "", "infra repo or terraform directory")
 	update := fs.Bool("update", false, "merge into an existing azemu.yaml")
 	dry := fs.Bool("dry-run", false, "print the YAML instead of writing it")
+	native := fs.Bool("native", false, "also write run: (and host_header:) for docker apps, derived from their Dockerfile, for `up --native`")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -78,6 +79,11 @@ func runInit(args []string) error {
 	}
 
 	draft := discover.Draft(cwd, *env, inf, discover.Match(code.Findings, model))
+	if *native {
+		for _, k := range draft.FillNative(cwd) {
+			warns = append(warns, fmt.Sprintf("%s: could not derive `run:` for --native from its Dockerfile; add it under apps.%s", k, k))
+		}
+	}
 	var b []byte
 	if exists && *update {
 		old, err := os.ReadFile(out)

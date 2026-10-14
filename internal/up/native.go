@@ -21,6 +21,7 @@ import (
 	"github.com/luigi23997/azemu/internal/build"
 	"github.com/luigi23997/azemu/internal/config"
 	"github.com/luigi23997/azemu/internal/contract"
+	"github.com/luigi23997/azemu/internal/discover"
 	"github.com/luigi23997/azemu/internal/host"
 	"github.com/luigi23997/azemu/internal/infra"
 	"github.com/luigi23997/azemu/internal/proxy"
@@ -56,7 +57,14 @@ func RunNative(ctx context.Context, o Options) error {
 	keys := slices.Sorted(maps.Keys(cfg.Apps))
 	for _, k := range keys {
 		if a := cfg.Apps[k]; a.Kind == "docker" && a.Run == "" {
-			return fmt.Errorf("app %s: a docker app needs `run:` in azemu.yaml for --native: the command that starts it, listening on {port}", k)
+			msg := fmt.Sprintf("app %s: a docker app needs `run:` in azemu.yaml for --native: the command that starts it, listening on {port}", k)
+			if run, hh, ok := discover.NativeRun(cfg.Abs(a.Path), a.Dockerfile); ok {
+				msg += fmt.Sprintf("\n  suggestion (from its Dockerfile):\n    run: %q", run)
+				if hh != "" {
+					msg += "\n    host_header: " + hh
+				}
+			}
+			return errors.New(msg)
 		}
 	}
 	header, err := identityHeader(cfg)

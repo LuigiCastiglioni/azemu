@@ -76,6 +76,10 @@ func runDoctor(args []string) error {
 			}
 			return out(ctx, "py", "--version")
 		}},
+		{"uv (uv.lock projects only)", false, "pip install --user uv (or https://docs.astral.sh/uv/)", func(ctx context.Context) (string, error) {
+			return out(ctx, "uv", "--version")
+		}},
+		{"func worker path length", true, "npm config set prefix %USERPROFILE%\\npm-global, put it on PATH, then npm i -g azure-functions-core-tools@4", checkFuncPathLength},
 		{"azemu CA trusted", host.GOOS() != "linux", "run: azemu trust", func(ctx context.Context) (string, error) {
 			if ok, hint := up.Trusted(); !ok {
 				return "", errors.New(hint)
@@ -149,6 +153,32 @@ func runDoctor(args []string) error {
 }
 
 func firstLine(s string) string { l, _, _ := strings.Cut(s, "\n"); return l }
+
+// funcWorkerFile is the deepest file of the Python worker bundled with Azure Functions Core Tools.
+const funcWorkerFile = `azure-functions-core-tools\bin\workers\python\3.12\WINDOWS\X64\azure_functions_worker\utils\dependency.py`
+
+// maxPath is Windows' MAX_PATH: files whose full path reaches it are silently not extracted by the Core Tools
+// installer, and the Python worker then dies with "No module named 'azure_functions_worker.utils.dependency'".
+const maxPath = 260
+
+// checkFuncPathLength catches the above on Windows when Core Tools sits under a long npm prefix (e.g. a winget Node.js).
+func checkFuncPathLength(ctx context.Context) (string, error) {
+	if host.GOOS() != "windows" {
+		return "n/a", nil
+	}
+	root, err := out(ctx, "npm", "root", "-g")
+	if err != nil {
+		return "n/a (npm not found)", nil
+	}
+	root = firstLine(root)
+	if _, err := os.Stat(root + `\azure-functions-core-tools`); err != nil {
+		return "n/a (not installed with npm)", nil
+	}
+	if n := len(root) + 1 + len(funcWorkerFile); n >= maxPath {
+		return "", fmt.Errorf("%d characters under %s (Windows allows %d): Core Tools cannot extract its Python worker there", n, root, maxPath-1)
+	}
+	return "ok under " + root, nil
+}
 
 // checkPorts: a port held by an azemu container is fine (already up); anything else is a conflict.
 func checkPorts(ctx context.Context) (string, error) {

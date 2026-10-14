@@ -1,0 +1,28 @@
+name: release
+
+# Publishes the WebAssembly build (run by Node.js, no .exe: see scripts/install-wasm.ps1) when a version tag is pushed.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: build
+        run: |
+          mkdir dist
+          GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" -o dist/azemu.wasm ./cmd/azemu
+          cp cmd/azemu/azemu-wasm.js scripts/install-wasm.ps1 dist/
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

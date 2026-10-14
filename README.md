@@ -44,29 +44,48 @@ Then install as above from a new terminal; `azemu.exe` lands in `%USERPROFILE%\g
 For machines that cannot run containers, such as an Azure Virtual Desktop without nested virtualization: `azemu up --native` runs everything as plain processes, no admin rights needed.
 
 ```
-npm i -g azure-functions-core-tools@4    # needs Node.js 22+; plus the Python version of your apps
-azemu doctor --native
+npm i -g azure-functions-core-tools@4    # needs Node.js 22+; plus the Python version of your apps (and uv for uv.lock projects)
+azemu doctor --native                    # checks every prerequisite below and says how to fix what is missing
 azemu trust                              # once: Windows asks to confirm adding the azemu CA to your user's roots
+azemu init --env dev --native            # like init, and writes run: / host_header: for docker apps from their Dockerfile
 azemu up --native
 ```
 
 - The proxy runs inside azemu and every app gets `HTTPS_PROXY` pointing at it: emulated hostnames (`*.azurewebsites.net`, the storage accounts, Graph) are answered locally, everything else is forwarded to the real host (through your own `HTTPS_PROXY`, if you have one). Ingress ports, Easy Auth headers and managed identity work as with Docker.
 - Azurite runs through `npx` (downloaded on first run), data in `.azemu/azurite`.
-- Zip apps run with `func start`: Python apps get a virtualenv in `.azemu/venv/<app>` (`pip install -r requirements.txt`, or `uv export` for a `uv.lock` project), Node apps get `npm ci` and `npm run build`. Docker apps need the command that starts them, listening on `{port}` (also in `$PORT`):
+- Zip apps run with `func start`: Python apps get a virtualenv in `.azemu/venv/<app>` (`pip install -r requirements.txt`, or `uv export` for a `uv.lock` project), Node apps get `npm ci` and `npm run build`. Docker apps need the command that starts them, listening on `{port}` (also in `$PORT`). `azemu init --native` derives it from the Dockerfile's `CMD`/`ENTRYPOINT` (uvicorn, gunicorn, flask, node) or, for a front end served by nginx, from the `dev` script of its `package.json`; `up --native` prints the same suggestion when `run:` is missing. Write it by hand when it cannot:
 
   ```yaml
   apps:
     web-backend:
       kind: docker
-      run: "python -m uvicorn main:app --host 127.0.0.1 --port {port}"
+      run: "uv run python -m uvicorn src.main:app --host 127.0.0.1 --port {port}"
+    web-frontend:
+      kind: docker
+      run: "npm run dev -- --host 127.0.0.1 --port {port}"
+      host_header: local
   ```
 
-  `run:` also overrides `func start` for a zip app.
+  `run:` also overrides `func start` for a zip app. `host_header: local` makes the app's ingress keep the `Host` the client sent (`127.0.0.1:<port>`) instead of the Azure hostname: dev servers such as Vite or webpack-dev-server answer `403 Blocked request` to hosts they do not know.
 - A change restarts the app; Ctrl-C stops everything (`status`, `logs` and `down` are for the Docker stack).
 - `azemu trust` is needed on Windows and macOS because the Functions host (.NET) only trusts the OS store there. It trusts a CA whose key is in `~/.azemu/ca`: anything that can read that file can mint certificates your user's programs accept.
-- When Defender ASR or application control blocks unsigned locally built `.exe` files, compile to WebAssembly and run via Node.js (`GOOS=js GOARCH=wasm go build -o azemu.wasm ./cmd/azemu` and `node cmd/azemu/azemu-wasm.js <command>`).
 
 Less faithful than Docker: apps run on your machine's Python/Node and OS, not Azure's Linux images; seed steps are skipped; a client that ignores `HTTPS_PROXY` (Node's `fetch` before Node 24, raw sockets) talks to the real Azure host and fails there, since it carries emulator keys and tokens.
+
+#### Locked-down Windows (blocked executables, no admin)
+
+Some managed machines block executables they do not know (Defender ASR rule "block executable files unless they meet a prevalence, age or trusted list criterion", AppLocker, WDAC): a freshly built `azemu.exe` fails with `Access is denied`, and so does every console-script shim a tool creates later (`uvicorn.exe` in a virtualenv). Signed runtimes such as `node.exe` and `python.exe` are not affected, so run azemu as WebAssembly on Node.js (20+):
+
+```
+irm https://github.com/luigi23997/azemu/releases/latest/download/install-wasm.ps1 | iex
+# or, from a checkout with Go: .\scripts\install-wasm.ps1 -FromSource
+```
+
+This puts `azemu.wasm`, `azemu-wasm.js` (the Node host) and `azemu.cmd`/`azemu.ps1` shims in `%USERPROFILE%\.azemu\bin` and adds that folder to your user `PATH` (open a new terminal). Behaviour is the same as the native build. Things that still bite on such machines, and what to do:
+
+- **`Access is denied` starting an app** (`uvicorn`, `gunicorn`, `flask`...): start Python servers as `python -m uvicorn ...` (with `uv run` in front for a `uv.lock` project), not through the console script. `azemu init --native` writes it that way.
+- **`func`'s Python worker dies with `No module named 'azure_functions_worker.utils.dependency'`**: a file path in the Core Tools package reaches Windows' 260-character limit and is silently not extracted, typically because Node.js came from winget (a very long npm prefix). `azemu doctor --native` reports it; fix with `npm config set prefix %USERPROFILE%\npm-global`, add that folder to `PATH`, and `npm i -g azure-functions-core-tools@4` again.
+- Developing azemu itself: `go test` binaries are blocked too; run the tests through the Node host instead: `GOOS=js GOARCH=wasm go test -exec "node cmd/azemu/azemu-wasm.js" ./...`.
 
 ## Quickstart
 

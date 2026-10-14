@@ -491,7 +491,11 @@ func proxyConfig(cfg *config.Config, m *infra.Model, env string, ports map[strin
 		if a := m.App(res); a != nil {
 			easy = a.EasyAuth
 		}
-		pc.Ingress = append(pc.Ingress, contract.Ingress{Port: ports[k], Upstream: up, Host: host, EasyAuth: easy})
+		ingressHost := host
+		if cfg.Apps[k].HostHeader == "local" {
+			ingressHost = ""
+		}
+		pc.Ingress = append(pc.Ingress, contract.Ingress{Port: ports[k], Upstream: up, Host: ingressHost, EasyAuth: easy})
 	}
 	accts := map[string]bool{}
 	for _, a := range m.StorageAccounts {

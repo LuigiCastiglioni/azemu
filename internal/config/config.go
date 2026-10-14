@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/luigi23997/azemu/internal/host"
 )
 
 const FileName = "azemu.yaml"
@@ -60,6 +62,10 @@ type App struct {
 	// Run starts the app in native mode (`up --native`, no containers), from Path, through the shell; {port} is the
 	// port to listen on (also in $PORT). Required for docker apps there; zip apps default to `func start --port {port}`.
 	Run string `yaml:"run,omitempty"`
+	// HostHeader is the Host header the app's ingress sends upstream: "azure" (default) is the app's
+	// <name>.azurewebsites.net, as in Azure; "local" keeps the one the client sent (127.0.0.1:<port>).
+	// Dev servers that check the Host header (Vite, webpack-dev-server, Django's ALLOWED_HOSTS) need "local".
+	HostHeader string `yaml:"host_header,omitempty"`
 }
 
 type Seed struct {
@@ -88,6 +94,11 @@ func Load(path string) (*Config, error) {
 	if c.Secrets == "" {
 		c.Secrets = ".env"
 	}
+	for k, a := range c.Apps {
+		if a != nil && a.HostHeader != "" && a.HostHeader != "azure" && a.HostHeader != "local" {
+			return nil, fmt.Errorf("%s: app %s: host_header %q: want azure or local", path, k, a.HostHeader)
+		}
+	}
 	return &c, nil
 }
 
@@ -104,10 +115,20 @@ func Expand(s, env string) string { return strings.ReplaceAll(s, "{env}", env) }
 
 // Abs resolves p against Root.
 func (c *Config) Abs(p string) string {
-	if filepath.IsAbs(p) {
+	if isAbs(p) {
 		return p
 	}
 	return filepath.Join(c.Root, p)
+}
+
+// isAbs is filepath.IsAbs plus Windows drive paths on a Windows host: the WebAssembly build uses Unix path
+// rules, under which "C:\x" or "C:/x" would otherwise look relative.
+func isAbs(p string) bool {
+	if filepath.IsAbs(p) {
+		return true
+	}
+	return host.GOOS() == "windows" && len(p) >= 3 && p[1] == ':' && (p[2] == '\\' || p[2] == '/') &&
+		(p[0] >= 'a' && p[0] <= 'z' || p[0] >= 'A' && p[0] <= 'Z')
 }
 
 // StatePath returns a path under <Root>/.azemu.

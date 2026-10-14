@@ -13,7 +13,7 @@ type ProxyConfig struct {
 type Ingress struct {
 	Port     int    `json:"port"`
 	Upstream string `json:"upstream"` // e.g. "http://func-orders:80"
-	Host     string `json:"host"`     // Azure hostname, sent as Host header upstream
+	Host     string `json:"host"`     // Azure hostname, sent as Host header upstream; empty keeps the client's Host
 	EasyAuth bool   `json:"easy_auth"`
 }
 
