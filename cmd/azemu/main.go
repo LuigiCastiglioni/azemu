@@ -15,7 +15,7 @@ Usage: azemu <command> [flags]
 Commands:
   init      discover apps from pipelines + terraform, write azemu.yaml
   up        build and start everything in parallel, then watch and rebuild (--native: no containers)
-  down      stop the stack (--volumes wipes emulated storage)
+  down      stop the stack (--volumes wipes emulated storage; --native: a stack started with up --native)
   status    show apps, local URLs, state
   env       print the resolved settings of an app
   logs      follow logs

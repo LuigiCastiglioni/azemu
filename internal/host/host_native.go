@@ -7,6 +7,7 @@ package host
 import (
 	"context"
 	"net"
+	"os"
 	"os/exec"
 	"runtime"
 	"syscall"
@@ -15,6 +16,9 @@ import (
 
 // GOOS is the operating system where azemu is running (the Node host OS when built for GOOS=js).
 func GOOS() string { return runtime.GOOS }
+
+// Getpid is the id of the running azemu process.
+func Getpid() int { return os.Getpid() }
 
 // Listen binds a TCP listener on the host.
 func Listen(network, address string) (net.Listener, error) {

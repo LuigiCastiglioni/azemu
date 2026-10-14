@@ -71,6 +71,11 @@ func RunNative(ctx context.Context, o Options) error {
 	if err != nil {
 		return err
 	}
+	state, err := openNativeState(cfg.StatePath(nativeStateFile))
+	if err != nil {
+		return err
+	}
+	defer state.clear() // runs last: after the apps and Azurite are stopped
 	portKeys := append(slices.Clone(keys), proxyPortKey, identityPortKey)
 	for _, k := range keys {
 		portKeys = append(portKeys, listenKey(k))
@@ -131,6 +136,7 @@ func RunNative(ctx context.Context, o Options) error {
 		return err
 	}
 	defer az.stop()
+	state.set("azurite", az.cmd.Process.Pid, "npx")
 	if err := stack.CreateObjects(ctx, m, caPEM); err != nil {
 		return err
 	}
@@ -138,7 +144,7 @@ func RunNative(ctx context.Context, o Options) error {
 		fmt.Fprintln(os.Stderr, "warning: seed steps run in containers and are skipped with --native")
 	}
 
-	n := &native{cfg: cfg, envs: envs, ports: ports, certs: certs, logTo: logTo, procs: map[string]*proc{}, launches: map[string]*launch{}}
+	n := &native{cfg: cfg, envs: envs, ports: ports, certs: certs, logTo: logTo, state: state, procs: map[string]*proc{}, launches: map[string]*launch{}}
 	defer n.stopAll()
 	results := n.prepareAll(ctx, keys)
 	n.mu.Lock()
@@ -174,6 +180,7 @@ type native struct {
 	ports    map[string]int
 	certs    string
 	logTo    func(name string) io.Writer
+	state    *nativeState // recorded pids, for `down --native`
 	mu       sync.Mutex
 	envs     map[string]map[string]string
 	procs    map[string]*proc
@@ -258,8 +265,11 @@ func (n *native) start(ctx context.Context, k string, l *launch) error {
 		return err
 	}
 	n.procs[k] = p
+	pid := p.cmd.Process.Pid
+	n.state.set(k, pid, matchFor(l))
 	go func() {
 		<-p.done
+		n.state.remove(k, pid)
 		if !p.stopping.Load() && ctx.Err() == nil {
 			fmt.Printf("[%s] exited (%s); it starts again on the next change\n", k, host.ExitState(p.cmd))
 		}

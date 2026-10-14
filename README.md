@@ -67,7 +67,7 @@ azemu up --native
   ```
 
   `run:` also overrides `func start` for a zip app. `host_header: local` makes the app's ingress keep the `Host` the client sent (`127.0.0.1:<port>`) instead of the Azure hostname: dev servers such as Vite or webpack-dev-server answer `403 Blocked request` to hosts they do not know.
-- A change restarts the app; Ctrl-C stops everything (`status`, `logs` and `down` are for the Docker stack).
+- A change restarts the app. Ctrl-C stops everything; so does `azemu down --native` from another terminal, or after a crash or a closed window left processes behind (`--volumes` also wipes the emulated storage in `.azemu/azurite`). `up --native` records azemu and the processes it starts in `.azemu/native.json`, which is what `down --native` reads: it stops only processes whose live command line still matches what was recorded, so a reused pid is never killed, and a second `up --native` in the same project is refused. `status` and `logs` are for the Docker stack.
 - `azemu trust` is needed on Windows and macOS because the Functions host (.NET) only trusts the OS store there. It trusts a CA whose key is in `~/.azemu/ca`: anything that can read that file can mint certificates your user's programs accept.
 
 Less faithful than Docker: apps run on your machine's Python/Node and OS, not Azure's Linux images; seed steps are skipped; a client that ignores `HTTPS_PROXY` (Node's `fetch` before Node 24, raw sockets) talks to the real Azure host and fails there, since it carries emulator keys and tokens.

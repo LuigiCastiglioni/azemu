@@ -49,11 +49,15 @@ func runDown(args []string) error {
 	fs := flag.NewFlagSet("down", flag.ContinueOnError)
 	file := fs.String("f", ".", "azemu.yaml or its directory")
 	vol := fs.Bool("volumes", false, "also wipe emulated storage")
+	native := fs.Bool("native", false, "stop a stack started with `up --native` instead of the containers")
 	if _, err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	ctx, stop := ctrlC()
 	defer stop()
+	if *native {
+		return up.DownNative(ctx, *file, *vol)
+	}
 	if err := up.Down(ctx, *file, *vol); err != nil {
 		return err
 	}

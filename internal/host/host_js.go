@@ -36,6 +36,16 @@ func hasBridge() bool {
 	return !h.IsUndefined() && !h.IsNull()
 }
 
+// Getpid is the id of the Node.js process hosting azemu (the Go runtime's own fake pid would be useless to `down`).
+func Getpid() int {
+	if p := js.Global().Get("process"); p.Type() == js.TypeObject {
+		if v := p.Get("pid"); v.Type() == js.TypeNumber {
+			return v.Int()
+		}
+	}
+	return os.Getpid()
+}
+
 // GOOS returns the underlying host OS reported by the Node.js runner.
 func GOOS() string {
 	if hasBridge() {
