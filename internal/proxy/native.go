@@ -56,11 +56,11 @@ func Native(ctx context.Context, cfg contract.ProxyConfig, o NativeOptions) (<-c
 	up := o.Upstream
 	if up == nil {
 		var sysPool *x509.CertPool
-		if p, err := x509.SystemCertPool(); err == nil {
-			sysPool = p
-		} else {
+		if b := systemRoots(); len(b) > 0 {
 			sysPool = x509.NewCertPool()
-			sysPool.AppendCertsFromPEM(systemRoots())
+			sysPool.AppendCertsFromPEM(b)
+		} else if p, err := x509.SystemCertPool(); err == nil {
+			sysPool = p
 		}
 		up = &http.Transport{
 			Proxy:               http.ProxyFromEnvironment,

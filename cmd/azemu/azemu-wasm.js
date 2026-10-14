@@ -136,45 +136,47 @@ function wrapSocket(sock) {
     ended = true;
     if (handlers) handlers.onEnd();
   });
-  sock.on("error", (err) => {
-    errMsg = err ? String(err.code || err.message || err) : "socket error";
-    if (handlers) handlers.onError(errMsg);
-  });
-  sock.on("close", () => {
-    closed = true;
-    if (handlers) handlers.onClose();
-  });
+	sock.on("error", (err) => {
+		errMsg = err ? String(err.code || err.message || err) : "socket error";
+		if (handlers) handlers.onError(errMsg);
+	});
+	sock.on("close", () => {
+		closed = true;
+		if (handlers) handlers.onClose();
+	});
 
-  return {
-    attach(onData, onEnd, onError, onClose) {
-      handlers = { onData, onEnd, onError, onClose };
-      while (chunks.length > 0) {
-        onData(chunks.shift());
-      }
-      if (errMsg) onError(errMsg);
-      if (ended) onEnd();
-      if (closed) onClose();
-    },
-    writeBytes(u8) {
-      try {
-        sock.write(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength));
-        return "";
-      } catch (e) {
-        return String(e.message || e);
-      }
-    },
-    close() {
-      try {
-        sock.end();
-        sock.destroy();
-      } catch {}
-    },
-    destroy() {
-      try {
-        sock.destroy();
-      } catch {}
-    },
-  };
+	return {
+		attach(onData, onEnd, onError, onClose) {
+			handlers = { onData, onEnd, onError, onClose };
+			while (chunks.length > 0) {
+				onData(chunks.shift());
+			}
+			if (errMsg) onError(errMsg);
+			if (ended) onEnd();
+			if (closed) onClose();
+		},
+		writeBytes(u8) {
+			try {
+				sock.write(Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength));
+				return "";
+			} catch (e) {
+				return String(e.message || e);
+			}
+		},
+		close() {
+			handlers = null;
+			try {
+				sock.end();
+				sock.destroy();
+			} catch {}
+		},
+		destroy() {
+			handlers = null;
+			try {
+				sock.destroy();
+			} catch {}
+		},
+	};
 }
 
 globalThis.__azemuHost = {

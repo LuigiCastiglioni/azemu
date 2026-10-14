@@ -110,6 +110,60 @@ func NewProcessGroup(shell string, argv []string) *exec.Cmd {
 	return cmd
 }
 
+type outChunk struct {
+	w io.Writer
+	b []byte
+}
+
+// outQueue is an unbounded FIFO: push never blocks, drain writes chunks in order until closed and empty.
+type outQueue struct {
+	mu     sync.Mutex
+	items  []outChunk
+	closed bool
+	sig    chan struct{}
+}
+
+func newOutQueue() *outQueue { return &outQueue{sig: make(chan struct{}, 1)} }
+
+func (q *outQueue) wake() {
+	select {
+	case q.sig <- struct{}{}:
+	default:
+	}
+}
+
+func (q *outQueue) push(w io.Writer, b []byte) {
+	q.mu.Lock()
+	q.items = append(q.items, outChunk{w, b})
+	q.mu.Unlock()
+	q.wake()
+}
+
+func (q *outQueue) close() {
+	q.mu.Lock()
+	q.closed = true
+	q.mu.Unlock()
+	q.wake()
+}
+
+func (q *outQueue) drain() {
+	for {
+		q.mu.Lock()
+		items, closed := q.items, q.closed
+		q.items = nil
+		q.mu.Unlock()
+		for _, c := range items {
+			c.w.Write(c.b)
+		}
+		if len(items) == 0 {
+			if closed {
+				return
+			}
+			<-q.sig
+		}
+	}
+}
+
 // Start begins cmd asynchronously via the Node.js host bridge.
 func Start(cmd *exec.Cmd) error {
 	if !hasBridge() {
@@ -147,17 +201,13 @@ func Start(cmd *exec.Cmd) error {
 	}
 	opts.Set("inheritStdin", cmd.Stdin == os.Stdin)
 
-	type chunk struct {
-		w io.Writer
-		b []byte
-	}
-	outCh := make(chan chunk, 128)
+	// JS callbacks run on the wasm event loop: they must never block, or writes that wait on that
+	// loop (os.Stdout) deadlock the whole process. So output goes through an unbounded queue.
+	q := newOutQueue()
 	outDone := make(chan struct{})
 	go func() {
 		defer close(outDone)
-		for c := range outCh {
-			c.w.Write(c.b)
-		}
+		q.drain()
 	}()
 
 	var onStdout, onStderr, onExit js.Func
@@ -165,7 +215,7 @@ func Start(cmd *exec.Cmd) error {
 		if cmd.Stdout != nil && len(args) > 0 {
 			b := make([]byte, args[0].Get("byteLength").Int())
 			js.CopyBytesToGo(b, args[0])
-			outCh <- chunk{w: cmd.Stdout, b: b}
+			q.push(cmd.Stdout, b)
 		}
 		return nil
 	})
@@ -173,7 +223,7 @@ func Start(cmd *exec.Cmd) error {
 		if cmd.Stderr != nil && len(args) > 0 {
 			b := make([]byte, args[0].Get("byteLength").Int())
 			js.CopyBytesToGo(b, args[0])
-			outCh <- chunk{w: cmd.Stderr, b: b}
+			q.push(cmd.Stderr, b)
 		}
 		return nil
 	})
@@ -181,7 +231,7 @@ func Start(cmd *exec.Cmd) error {
 		onStdout.Release()
 		onStderr.Release()
 		onExit.Release()
-		close(outCh)
+		q.close()
 		close(stopKeepAlive)
 		code := 0
 		errStr := ""
@@ -220,7 +270,7 @@ func Start(cmd *exec.Cmd) error {
 		onStdout.Release()
 		onStderr.Release()
 		onExit.Release()
-		close(outCh)
+		q.close()
 		close(stopKeepAlive)
 		return errors.New(errVal.String())
 	}
@@ -349,11 +399,13 @@ func Listen(network, address string) (net.Listener, error) {
 			&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: localPort},
 			&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: remotePort},
 		)
-		select {
-		case connCh <- c:
-		case <-closed:
-			c.Close()
-		}
+		go func() { // the callback must not block on a full accept queue
+			select {
+			case connCh <- c:
+			case <-closed:
+				c.Close()
+			}
+		}()
 		return nil
 	})
 
